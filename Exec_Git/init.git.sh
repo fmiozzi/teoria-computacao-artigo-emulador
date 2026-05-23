@@ -21,7 +21,8 @@
 set -euo pipefail
 
 # Remoto padrão deste projeto (Emulador).
-DEFAULT_REMOTE_URL="https://github.com/fmiozzi/teoria-computacao-artigo-emulador.git"
+# Usamos SSH porque o usuário desta máquina tem chave SSH configurada no GitHub.
+DEFAULT_REMOTE_URL="git@github.com:fmiozzi/teoria-computacao-artigo-emulador.git"
 
 # =============================
 # Cores e helpers de output
