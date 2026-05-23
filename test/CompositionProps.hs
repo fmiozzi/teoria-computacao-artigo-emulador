@@ -18,6 +18,9 @@ import qualified Monitor.Automata.A1      as A1
 import qualified Monitor.Automata.A2      as A2
 import qualified Monitor.Automata.A3      as A3
 import qualified Monitor.Automata.A4      as A4
+import qualified Monitor.Automata.A6      as A6
+import qualified Monitor.Automata.A7      as A7
+import qualified Monitor.Automata.A8      as A8
 import qualified Monitor.Composed         as C
 import           Monitor.Types
 
@@ -49,6 +52,8 @@ prop_stream tes =
       ind = minimum
               [ A1.verdict (C.csM1 s), A2.verdict (C.csM2 s)
               , A3.verdict (C.csM3 s), A4.verdict (C.csM4 s)
+              , A6.verdict (C.csM6 s), A7.verdict (C.csM7 s)
+              , A8.verdict (C.csM8 s)
               ]
   in C.verdict s == ind
 
@@ -58,6 +63,8 @@ prop_terminal tes =
       ind = minimum
               [ A1.finalVerdict (C.csM1 s), A2.finalVerdict (C.csM2 s)
               , A3.finalVerdict (C.csM3 s), A4.finalVerdict (C.csM4 s)
+              , A6.finalVerdict (C.csM6 s), A7.finalVerdict (C.csM7 s)
+              , A8.finalVerdict (C.csM8 s)
               ]
   in C.finalVerdict s == ind
 

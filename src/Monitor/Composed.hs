@@ -1,17 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Produto sincronizado dos autômatos M_k (Proposição 2 do artigo).
+-- | Produto sincronizado dos autômatos M_k (Proposição 2 do artigo) +
+-- extensões A6/A7/A8 da Fase 10.
 --
 -- O veredito composto é o ínfimo dos vereditos individuais no reticulado
--- ⊥ < ? < ⊤. Como ⊥ é absorvente, basta o autômato individual mais
--- pessimista para determinar o veredito composto.
---
--- A Fase 7 acrescenta:
---
--- * @csObs@/@csTau@ — acumula 'Multiset' de classificações confiáveis
---   (A5) para o output detalhado;
--- * 'Step' e 'runMonitorTrace' — captura o estado pós-step de cada
---   evento, permitindo renderizar o trace evento-a-evento.
+-- ⊥ < ? < ⊤. Como ⊥ é absorvente em cada componente, basta o autômato
+-- individual mais pessimista para determinar o veredito composto.
 module Monitor.Composed
   ( -- * Estado
     ComposedState (..)
@@ -33,6 +27,9 @@ import qualified Monitor.Automata.A1 as A1
 import qualified Monitor.Automata.A2 as A2
 import qualified Monitor.Automata.A3 as A3
 import qualified Monitor.Automata.A4 as A4
+import qualified Monitor.Automata.A6 as A6
+import qualified Monitor.Automata.A7 as A7
+import qualified Monitor.Automata.A8 as A8
 import qualified Monitor.Multiset    as MS
 import           Monitor.Multiset    (Multiset)
 import           Monitor.Types       ( Config (..)
@@ -46,6 +43,9 @@ data ComposedState = ComposedState
   , csM2   :: !A2.M2
   , csM3   :: !A3.M3
   , csM4   :: !A4.M4
+  , csM6   :: !A6.M6
+  , csM7   :: !A7.M7
+  , csM8   :: !A8.M8
   , csObs  :: !Multiset
   , csTau  :: !Double
   } deriving (Eq, Show)
@@ -56,6 +56,9 @@ initial cfg = ComposedState
   , csM2  = A2.initial cfg
   , csM3  = A3.initial
   , csM4  = A4.initial cfg
+  , csM6  = A6.initial cfg
+  , csM7  = A7.initial cfg
+  , csM8  = A8.initial cfg
   , csObs = MS.empty
   , csTau = cfgTau cfg
   }
@@ -63,14 +66,23 @@ initial cfg = ComposedState
 step :: ComposedState -> TimedEvent -> ComposedState
 step s te =
   let evt  = teEvent te
+      now  = teTime te
       obs' = case evt of
-        ClsPI sku conf | conf >= csTau s -> MS.addCls sku (csObs s)
-        _                                -> csObs s
+        ClsPI sku conf
+          | conf >= csTau s -> MS.addCls sku (csObs s)
+          | otherwise       -> csObs s
+        RejI -> case A7.lastClsValid (csM7 s) now of
+          Just sku -> MS.removeCls sku (csObs s)
+          Nothing  -> csObs s
+        _ -> csObs s
   in s
     { csM1  = A1.step (csM1 s) evt
     , csM2  = A2.step (csM2 s) te
     , csM3  = A3.step (csM3 s) evt
     , csM4  = A4.step (csM4 s) te
+    , csM6  = A6.step (csM6 s) te
+    , csM7  = A7.step (csM7 s) te
+    , csM8  = A8.step (csM8 s) te
     , csObs = obs'
     }
 
@@ -78,12 +90,16 @@ verdict :: ComposedState -> Verdict
 verdict s = minimum
   [ A1.verdict (csM1 s), A2.verdict (csM2 s)
   , A3.verdict (csM3 s), A4.verdict (csM4 s)
+  , A6.verdict (csM6 s), A7.verdict (csM7 s)
+  , A8.verdict (csM8 s)
   ]
 
 finalVerdict :: ComposedState -> Verdict
 finalVerdict s = minimum
   [ A1.finalVerdict (csM1 s), A2.finalVerdict (csM2 s)
   , A3.finalVerdict (csM3 s), A4.finalVerdict (csM4 s)
+  , A6.finalVerdict (csM6 s), A7.finalVerdict (csM7 s)
+  , A8.finalVerdict (csM8 s)
   ]
 
 violatingRules :: ComposedState -> [String]
@@ -91,6 +107,8 @@ violatingRules s =
   [ n | (v, n) <-
       [ (A1.verdict (csM1 s), "A1"), (A2.verdict (csM2 s), "A2")
       , (A3.verdict (csM3 s), "A3"), (A4.verdict (csM4 s), "A4")
+      , (A6.verdict (csM6 s), "A6"), (A7.verdict (csM7 s), "A7")
+      , (A8.verdict (csM8 s), "A8")
       ], v == Bot
   ]
 
@@ -99,19 +117,22 @@ finalViolatingRules s =
   [ n | (v, n) <-
       [ (A1.finalVerdict (csM1 s), "A1"), (A2.finalVerdict (csM2 s), "A2")
       , (A3.finalVerdict (csM3 s), "A3"), (A4.finalVerdict (csM4 s), "A4")
+      , (A6.finalVerdict (csM6 s), "A6"), (A7.finalVerdict (csM7 s), "A7")
+      , (A8.finalVerdict (csM8 s), "A8")
       ], v == Bot
   ]
 
--- | Sumário inline dos 4 autômatos (usado pelo output detalhado).
 summary :: ComposedState -> String
-summary s =
-  "M1:" ++ A1.summary (csM1 s) ++
-  " M2:" ++ A2.summary (csM2 s) ++
-  " M3:" ++ A3.summary (csM3 s) ++
-  " M4:" ++ A4.summary (csM4 s)
+summary s = unwords
+  [ "M1:" ++ A1.summary (csM1 s)
+  , "M2:" ++ A2.summary (csM2 s)
+  , "M3:" ++ A3.summary (csM3 s)
+  , "M4:" ++ A4.summary (csM4 s)
+  , "M6:" ++ A6.summary (csM6 s)
+  , "M7:" ++ A7.summary (csM7 s)
+  , "M8:" ++ A8.summary (csM8 s)
+  ]
 
--- | Captura, por evento processado, o estado pós-step + vereditos.
--- Usado pelo output detalhado e pelo JSON.
 data Step = Step
   { stepIdx     :: !Int
   , stepTime    :: !Int
@@ -121,8 +142,6 @@ data Step = Step
   , stepRules   :: ![String]
   } deriving (Eq, Show)
 
--- | Versão "leve" usada pelo modo @--quiet@: só veredito final, ofensor
--- e regras. Compatível com a API da Peça 1.
 runMonitor :: Config -> [TimedEvent] -> (Verdict, Maybe (Int, Event), [String])
 runMonitor cfg = go 1 (initial cfg)
   where
@@ -136,16 +155,10 @@ runMonitor cfg = go 1 (initial cfg)
            then (Bot, Just (i, e), violatingRules s')
            else go (i + 1) s' tes
 
--- | Versão "rica": além do veredito final, devolve a sequência de
--- 'Step's para inspeção. A execução não pára na primeira violação —
--- o trace completo é entregue, com o veredito agregado refletindo o
--- estado final (incluindo 'finalVerdict').
 runMonitorTrace
   :: Config
   -> [TimedEvent]
   -> ([Step], Verdict, Maybe Int, [String])
-  -- ^ (trace, veredito final, índice 1-based da primeira violação se
-  -- detectada no stream, regras violadas no estado final)
 runMonitorTrace cfg tes =
   let (steps, sFinal) = scanTrace cfg tes
       mFirst = firstViolationIdx steps

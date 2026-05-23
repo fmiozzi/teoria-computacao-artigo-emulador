@@ -15,6 +15,7 @@ module Monitor.Multiset
   , Diff
   , empty
   , addCls
+  , removeCls
   , compareMs
   , showDiff
   ) where
@@ -36,6 +37,15 @@ empty = Map.empty
 -- | Contabiliza uma classificação aceita (A5 já filtrou por confiança).
 addCls :: SKU -> Multiset -> Multiset
 addCls sku = Map.insertWith (+) sku 1
+
+-- | Decrementa o contador de um SKU (chamado por A7 quando um rej_i
+-- refere-se a uma classificação prévia). Entradas que vão a zero são
+-- removidas; contadores não ficam negativos.
+removeCls :: SKU -> Multiset -> Multiset
+removeCls sku m = case Map.lookup sku m of
+  Just n | n > 1 -> Map.insert sku (n - 1) m
+         | otherwise -> Map.delete sku m
+  Nothing -> m
 
 -- | Compara @M_obs@ com @M_dec@. @Right ()@ = iguais; @Left diff@ = diverge.
 compareMs :: Multiset -> Multiset -> Either Diff ()

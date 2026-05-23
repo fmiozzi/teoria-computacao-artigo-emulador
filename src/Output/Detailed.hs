@@ -19,6 +19,9 @@ import qualified Monitor.Automata.A1    as A1
 import qualified Monitor.Automata.A2    as A2
 import qualified Monitor.Automata.A3    as A3
 import qualified Monitor.Automata.A4    as A4
+import qualified Monitor.Automata.A6    as A6
+import qualified Monitor.Automata.A7    as A7
+import qualified Monitor.Automata.A8    as A8
 import           Monitor.Composed       ( ComposedState (..)
                                         , Step (..)
                                         , finalVerdict
@@ -35,7 +38,7 @@ import           Monitor.Types          ( Config (..)
                                         )
 
 version :: String
-version = "0.6.0"
+version = "0.7.0"
 
 sep, halfSep :: String
 sep     = replicate 67 '='
@@ -80,8 +83,8 @@ headerLines :: [String]
 headerLines =
   [ sep
   , "EMULADOR LTL/TLTL — Monitor de Apontamento de Produção"
-  , "Versão " ++ version ++ " — Implementa A1, A2, A3, A4, A5 + mes-bridge"
-  , "Referência: Miozzi (2026), §4–5"
+  , "Versão " ++ version ++ " — A1, A2, A3, A4, A5 + extensões A6, A7, A8"
+  , "Referência: Miozzi (2026), §4–6"
   , sep
   , ""
   ]
@@ -109,9 +112,12 @@ parameters :: Config -> [String]
 parameters cfg =
   [ ""
   , "Parâmetros do monitor:"
-  , "  T_cls = " ++ show (cfgTcls cfg) ++ " ms   (A2)"
-  , "  T_pcp = " ++ show (cfgTpcp cfg) ++ " ms   (A4)"
-  , "  τ     = " ++ show (cfgTau cfg)  ++ "          (A5)"
+  , "  T_cls    = " ++ show (cfgTcls cfg)   ++ " ms   (A2)"
+  , "  T_pcp    = " ++ show (cfgTpcp cfg)   ++ " ms   (A4)"
+  , "  T_h      = " ++ show (cfgTh cfg)     ++ " ms   (A6)"
+  , "  T_rej    = " ++ show (cfgTrej cfg)   ++ " ms   (A7)"
+  , "  T_ab_max = " ++ show (cfgTabMax cfg) ++ " ms   (A8)"
+  , "  τ        = " ++ show (cfgTau cfg)    ++ "        (A5)"
   ]
 
 declaredLines :: Maybe TraceHeader -> [String]
@@ -144,12 +150,15 @@ finalSection steps =
 perPropertyVerdicts :: Maybe ComposedState -> [String]
 perPropertyVerdicts Nothing  = []
 perPropertyVerdicts (Just s) =
-  [ "  A1 (safety: rem → ab)            : " ++ verdictSymFinal (A1.finalVerdict (csM1 s))
-  , "  A2 (TLTL: cls em T_cls)          : " ++ verdictSymFinal (A2.finalVerdict (csM2 s))
-  , "  A3 (safety: leave → match ∨ div) : " ++ verdictSymFinal (A3.finalVerdict (csM3 s))
-  , "  A4 (TLTL: esc em T_pcp)          : " ++ verdictSymFinal (A4.finalVerdict (csM4 s))
-  , "  A5 (filtro confiança ≥ τ)         : ⊤  (filtro estrutural — sempre OK)"
-  , "  Veredito final composto          : " ++ verdictSymFinal (finalVerdict s)
+  [ "  A1 (safety: rem → ab)              : " ++ verdictSymFinal (A1.finalVerdict (csM1 s))
+  , "  A2 (TLTL: cls em T_cls)            : " ++ verdictSymFinal (A2.finalVerdict (csM2 s))
+  , "  A3 (safety: leave → match ∨ div)   : " ++ verdictSymFinal (A3.finalVerdict (csM3 s))
+  , "  A4 (TLTL: esc em T_pcp)            : " ++ verdictSymFinal (A4.finalVerdict (csM4 s))
+  , "  A5 (filtro confiança ≥ τ)           : ⊤  (filtro estrutural — sempre OK)"
+  , "  A6 (TLTL: heartbeat em T_h)        : " ++ verdictSymFinal (A6.finalVerdict (csM6 s))
+  , "  A7 (safety: rej → cls recente)     : " ++ verdictSymFinal (A7.finalVerdict (csM7 s))
+  , "  A8 (TLTL: janela ≤ T_ab_max)       : " ++ verdictSymFinal (A8.finalVerdict (csM8 s))
+  , "  Veredito final composto            : " ++ verdictSymFinal (finalVerdict s)
   ]
 
 gateDecision :: Verdict -> Maybe Int -> [String] -> [String]

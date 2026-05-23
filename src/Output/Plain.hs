@@ -49,4 +49,7 @@ describeRule "A1" = "  A1: G(rem_i -> ab_i)                       (rem_i fora da
 describeRule "A2" = "  A2: G(rem_i -> F[0,T_cls] cls_p_i)          (cls atrasada ou ausente)"
 describeRule "A3" = "  A3: G(leave_ab_i -> match_i v div_i)        (fim da janela sem pronunciamento)"
 describeRule "A4" = "  A4: G(div_i -> F[0,T_pcp] esc_pcp_i)        (escalação ao PCP atrasada ou ausente)"
+describeRule "A6" = "  A6: G F[0,T_h] heartbeat                    (agente sem sinal de vida)"
+describeRule "A7" = "  A7: G(rej_i -> cls recente em T_rej)        (rejeição sem classificação prévia)"
+describeRule "A8" = "  A8: G(ab_i -> F[0,T_ab_max] leave_ab_i)     (janela longa demais)"
 describeRule r    = "  " ++ r

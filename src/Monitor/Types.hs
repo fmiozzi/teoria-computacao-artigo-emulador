@@ -37,6 +37,7 @@ data Event
   | EscPcpI              -- ^ esc_pcp_i: escalação ao PCP
   | ClsPI T.Text Double  -- ^ cls_{p,i}: classificação (SKU + confiança)
   | Heartbeat            -- ^ heartbeat: sinal de vida do agente (A6)
+  | RejI                 -- ^ rej_i: peça marcada como refugo (A7)
   deriving (Eq, Show)
 
 -- | Evento com timestamp em milissegundos desde o início do traço.
@@ -80,6 +81,7 @@ data Config = Config
   { cfgTcls      :: Int       -- ^ T_cls (ms): latência máxima de classificação (A2)
   , cfgTpcp      :: Int       -- ^ T_pcp (ms): prazo de escalação ao PCP (A4)
   , cfgTh        :: Int       -- ^ T_h (ms): período máximo entre heartbeats (A6)
+  , cfgTrej      :: Int       -- ^ T_rej (ms): janela em que rej_i pode se referir a cls (A7)
   , cfgTabMax    :: Int       -- ^ T_ab_max (ms): duração máxima da janela (A8)
   , cfgTau       :: Double    -- ^ τ: limiar de confiança da CNN (A5)
   , cfgValidSKUs :: [T.Text]  -- ^ SKUs aceitos pelo classificador
@@ -90,6 +92,7 @@ defaultConfig = Config
   { cfgTcls      = 30000      -- 30 s
   , cfgTpcp      = 300000     -- 5 min
   , cfgTh        = 5000       -- 5 s
+  , cfgTrej      = 10000      -- 10 s (janela para rej_i referir-se a cls_p_i)
   , cfgTabMax    = 900000     -- 15 min
   , cfgTau       = 0.85
   , cfgValidSKUs =
@@ -111,4 +114,5 @@ showEvent MatchI      = "match_i"
 showEvent DivI        = "div_i"
 showEvent EscPcpI     = "esc_pcp_i"
 showEvent Heartbeat   = "heartbeat"
+showEvent RejI        = "rej_i"
 showEvent (ClsPI s c) = "cls_p_i " ++ T.unpack s ++ " " ++ show c

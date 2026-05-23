@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               lab-monitor
-version:            0.6.0.0
+version:            0.7.0.0
 synopsis:           Monitor LTL/TLTL para verificação em tempo de execução
                     de propriedades operacionais de um agente de visão
                     computacional em manufatura
@@ -25,6 +25,9 @@ library
       , Monitor.Automata.A2
       , Monitor.Automata.A3
       , Monitor.Automata.A4
+      , Monitor.Automata.A6
+      , Monitor.Automata.A7
+      , Monitor.Automata.A8
       , Monitor.Composed
       , Output.Plain
       , Output.Detailed

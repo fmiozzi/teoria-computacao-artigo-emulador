@@ -50,8 +50,11 @@ splitHeader ls = case dropWhile isBlank ls of
 -- | Linhas relevantes (não vazias, não comentário) viram 'TimedEvent's.
 -- O índice avança apenas em eventos válidos, de forma que linhas em
 -- branco e comentários não "consomem" um slot de timestamp implícito.
+--
+-- Comentários inline (@\#@ no meio da linha) são removidos antes do
+-- parsing — útil para anotar timestamps grandes.
 parseBody :: [T.Text] -> Either String [TimedEvent]
-parseBody = go 0 . map T.strip
+parseBody = go 0 . map (T.strip . stripInlineComment)
   where
     go _ [] = Right []
     go evtIdx (l : rest)
@@ -60,6 +63,12 @@ parseBody = go 0 . map T.strip
       | otherwise = do
           te <- parseTimedEvent evtIdx l
           (te :) <$> go (evtIdx + 1) rest
+
+-- | Remove o sufixo de comentário inline (@\# ...@) de uma linha.
+-- Não temos literais com @\#@ no nosso vocabulário, então um corte
+-- direto no primeiro @\#@ é seguro.
+stripInlineComment :: T.Text -> T.Text
+stripInlineComment = T.takeWhile (/= '#')
 
 parseTimedEvent :: Int -> T.Text -> Either String TimedEvent
 parseTimedEvent implicitIdx line = do
@@ -108,6 +117,7 @@ parseEvent line = case T.words line of
   ["div_i"]              -> Right DivI
   ["esc_pcp_i"]          -> Right EscPcpI
   ["heartbeat"]          -> Right Heartbeat
+  ["rej_i"]              -> Right RejI
   ["cls_p_i", sku, conf] -> case reads (T.unpack conf) :: [(Double, String)] of
     [(c, "")] -> Right (ClsPI sku c)
     _         -> Left ("confiança inválida: " <> T.unpack conf)

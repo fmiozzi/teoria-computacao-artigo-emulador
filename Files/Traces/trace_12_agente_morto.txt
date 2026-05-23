@@ -5,22 +5,20 @@ braco: 2
 m_dec: {caixa_2000L: 2}
 veredito_esperado: BOT
 ---
-# DEPENDÊNCIA: este traço requer A6 (Fase 10) — extensão proposta.
-# Até lá o monitor aceita o trace (A6 não existe e nenhuma das outras
-# propriedades é violada).
-#
-# Cenário (Cenário 6 da matriz de propriedades):
+# Cenário 6 da matriz de propriedades (agente "morto"):
 #   O agente de visão "morreu" entre t=3000 e t=13000 ms. O processo
-#   físico continuou (operador trabalhou), mas o agente não emitiu
-#   eventos no intervalo. Quando volta em t=13000 ainda consegue
-#   completar a janela com retiradas e classificações dentro do prazo.
-#   O trace é localmente consistente — só A6 detecta o "silêncio".
+#   físico continuou, mas o agente não emitiu eventos no intervalo.
+#   Quando volta em t=13000 ainda consegue completar a janela com
+#   retiradas e classificações dentro do prazo. O trace é localmente
+#   consistente — só A6 detecta o "silêncio".
 #
 # A6: G F_[0, T_h] heartbeat_i
 #   "Heartbeat publicado ao menos a cada T_h ms."
 #   Default T_h = 5000 ms.
 #
-# Aqui há gap de 10 s entre heartbeats em t=3000 e t=13000 → viola A6.
+# Nota: A6 só "arma" após o primeiro heartbeat (semântica operacional).
+# O primeiro heartbeat em t=0 ativa o monitor. Gap de 10 s entre os
+# heartbeats em t=3000 e t=13000 → viola A6.
 
 [t=     0] ab_i
 [t=     0] heartbeat

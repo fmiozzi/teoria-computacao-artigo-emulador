@@ -5,12 +5,8 @@ braco: 1
 m_dec: {caixa_2000L: 4}
 veredito_esperado: BOT
 ---
-# DEPENDÊNCIA: este traço requer A8 (Fase 10) — extensão proposta.
-# Até lá, o monitor atual aceita o traço (todas as outras propriedades
-# ficam satisfeitas, A8 não existe).
-#
-# Cenário (Cenário 5 da matriz de propriedades):
-#   O braço chega à estação, o operador inicia o desmolde, e é
+# Cenário 5 da matriz de propriedades (janela longa demais):
+#   O braço chega à estação, o operador inicia o desmolde e é
 #   interrompido (banheiro, almoço, supervisor). A janela fica aberta
 #   por 34 min quando o ciclo normal é ~8 min. Cada retirada individual
 #   está correta e classificada dentro de T_cls; o agente até emite
