@@ -1,0 +1,6 @@
+# Traço de aceitação — janela aberta e fechada sem retiradas
+# (A1 é trivialmente satisfeita porque rem_i nunca ocorre)
+# Esperado: ACEITA
+
+ab_i
+leave_ab_i

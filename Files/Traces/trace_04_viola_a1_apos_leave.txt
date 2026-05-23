@@ -1,0 +1,8 @@
+# Violacao de A1 - rem_i ocorre APOS leave_ab_i
+# (operador tenta retirar peça depois do fim da janela)
+# Esperado: VIOLA na posição #4
+
+ab_i
+rem_i
+leave_ab_i
+rem_i

@@ -1,0 +1,8 @@
+# Traço de aceitação — uma peça retirada dentro da janela de abastecimento
+# Esperado: ACEITA
+
+ab_i
+rem_i
+cls_p_i caixa_1000L 0.93
+leave_ab_i
+match_i

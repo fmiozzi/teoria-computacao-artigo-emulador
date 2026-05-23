@@ -1,0 +1,24 @@
+# Build / compilação
+dist-newstyle/
+.stack-work/
+*.o
+*.hi
+*.dyn_o
+*.dyn_hi
+
+# Binários gerados
+result
+
+# Temporários
+*.tmp
+*.bak
+*~
+
+# Ambiente
+.env
+.env.local
+
+# Editor
+.vscode/
+.idea/
+*.swp

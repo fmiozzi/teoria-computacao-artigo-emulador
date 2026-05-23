@@ -1,0 +1,13 @@
+# Traço de aceitação — múltiplas peças retiradas em sequência dentro da janela
+# (cenário típico de um braço com vários moldes)
+# Esperado: ACEITA
+
+ab_i
+rem_i
+cls_p_i caixa_500L  0.91
+rem_i
+cls_p_i caixa_1000L 0.95
+rem_i
+cls_p_i caixa_2000L 0.88
+leave_ab_i
+match_i

@@ -1,0 +1,7 @@
+# Violacao de A1 - rem_i ocorre ANTES de ab_i
+# (peça retirada antes da janela de abastecimento abrir)
+# Esperado: VIOLA na posição #1
+
+rem_i
+ab_i
+leave_ab_i
