@@ -17,6 +17,7 @@ import           System.IO          (hPutStrLn, stderr)
 
 import           Monitor.Parser     (parseFile)
 import           Monitor.Composed   (runMonitor)
+import           Monitor.MesBridge  (injectMesBridge)
 import           Monitor.Types      (Verdict (..), defaultConfig)
 import           Output.Plain       (renderReport)
 
@@ -36,9 +37,11 @@ processFile filepath = do
     Left err -> do
       hPutStrLn stderr ("Erro ao parsear traço: " ++ err)
       exitWith (ExitFailure 1)
-    Right (_hdr, events) -> do
-      let (v, viol, rules) = runMonitor defaultConfig events
-      putStr (renderReport filepath (length events) v viol rules)
+    Right (hdr, events) -> do
+      let cfg              = defaultConfig
+          events'          = injectMesBridge cfg hdr events
+          (v, viol, rules) = runMonitor cfg events'
+      putStr (renderReport filepath (length events') v viol rules)
       case v of
         Top -> exitWith ExitSuccess
         Bot -> exitWith (ExitFailure 2)

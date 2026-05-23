@@ -16,6 +16,7 @@ executable lab-monitor
       , Monitor.Parser
       , Monitor.Header
       , Monitor.Multiset
+      , Monitor.MesBridge
       , Monitor.Automata.A1
       , Monitor.Automata.A2
       , Monitor.Automata.A3
