@@ -17,7 +17,7 @@ import           System.IO          (hPutStrLn, stderr)
 
 import           Monitor.Parser     (parseFile)
 import           Monitor.Composed   (runMonitor)
-import           Monitor.Types      (Verdict (..))
+import           Monitor.Types      (Verdict (..), defaultConfig)
 import           Output.Plain       (renderReport)
 
 main :: IO ()
@@ -37,7 +37,7 @@ processFile filepath = do
       hPutStrLn stderr ("Erro ao parsear traço: " ++ err)
       exitWith (ExitFailure 1)
     Right (_hdr, events) -> do
-      let (v, viol, rules) = runMonitor events
+      let (v, viol, rules) = runMonitor defaultConfig events
       putStr (renderReport filepath (length events) v viol rules)
       case v of
         Top -> exitWith ExitSuccess

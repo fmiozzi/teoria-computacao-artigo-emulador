@@ -1,0 +1,22 @@
+---
+cenario: "Classificação atrasada — gap > T_cls entre rem_i e cls_p_i"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_2000L: 1}
+veredito_esperado: BOT
+---
+# Operador retira a peça em t=1500 ms. A CNN demora 33500 ms para
+# devolver a classificação (cls em t=35000), o que excede T_cls (30000).
+# A2 viola assim que o tempo de qualquer evento ultrapassa o prazo do
+# rem_i pendente — na prática, o próprio evento de cls_p_i atrasado já
+# dispara a transição para o sumidouro.
+#
+# Demais propriedades: A1 ok (rem dentro da janela), A3 ok (leave +
+# match), A5 ok (conf 0.92 ≥ τ=0.85).
+# Veredito composto: ⊥ pelo ínfimo (A2 puxa para baixo).
+
+[t=     0] ab_i
+[t=  1500] rem_i
+[t= 35000] cls_p_i caixa_2000L 0.92
+[t= 37000] leave_ab_i
+[t= 37000] match_i

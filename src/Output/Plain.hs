@@ -45,6 +45,7 @@ locationLine (Just (i, e)) = "Violacao no evento #" ++ show i ++ ": " ++ showEve
 locationLine Nothing       = "Violacao detectada no fim do traço."
 
 describeRule :: String -> String
-describeRule "A1" = "  A1: G(rem_i -> ab_i)             (rem_i ocorreu fora da janela)"
-describeRule "A3" = "  A3: G(leave_ab_i -> match_i v div_i) (fim da janela sem pronunciamento)"
+describeRule "A1" = "  A1: G(rem_i -> ab_i)                       (rem_i fora da janela)"
+describeRule "A2" = "  A2: G(rem_i -> F[0,T_cls] cls_p_i)          (cls atrasada ou ausente)"
+describeRule "A3" = "  A3: G(leave_ab_i -> match_i v div_i)        (fim da janela sem pronunciamento)"
 describeRule r    = "  " ++ r
