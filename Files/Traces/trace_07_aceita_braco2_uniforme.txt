@@ -1,0 +1,21 @@
+---
+cenario: "Braço 2 com OP C uniforme (4× caixa_2000L)"
+maquina: ROTO-01
+braco: 2
+m_dec: {caixa_2000L: 4}
+veredito_esperado: TOP
+---
+# Cenário real de job uniforme: uma só OP, um só SKU.
+# M_obs = {2000L:4} = M_dec → match.
+
+[t=     0] ab_i
+[t=  2000] rem_i
+[t=  2500] cls_p_i caixa_2000L 0.92
+[t=  4500] rem_i
+[t=  5000] cls_p_i caixa_2000L 0.94
+[t=  7000] rem_i
+[t=  7500] cls_p_i caixa_2000L 0.90
+[t=  9500] rem_i
+[t= 10000] cls_p_i caixa_2000L 0.93
+[t= 12000] leave_ab_i
+[t= 12000] match_i

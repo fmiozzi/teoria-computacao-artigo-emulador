@@ -17,6 +17,7 @@ executable lab-monitor
       , Monitor.Header
       , Monitor.Multiset
       , Monitor.Automata.A1
+      , Monitor.Automata.A3
       , Monitor.Composed
       , Output.Plain
     build-depends:

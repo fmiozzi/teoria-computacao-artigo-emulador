@@ -37,8 +37,8 @@ processFile filepath = do
       hPutStrLn stderr ("Erro ao parsear traço: " ++ err)
       exitWith (ExitFailure 1)
     Right (_hdr, events) -> do
-      let (v, viol) = runMonitor events
-      putStr (renderReport filepath (length events) v viol)
+      let (v, viol, rules) = runMonitor events
+      putStr (renderReport filepath (length events) v viol rules)
       case v of
         Top -> exitWith ExitSuccess
         Bot -> exitWith (ExitFailure 2)

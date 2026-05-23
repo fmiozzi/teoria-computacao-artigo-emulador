@@ -1,6 +1,9 @@
-# Traço de aceitação — janela aberta e fechada sem retiradas
-# (A1 é trivialmente satisfeita porque rem_i nunca ocorre)
+# Traço de aceitação — janela aberta e fechada sem retiradas.
+# A1 é trivialmente satisfeita (rem_i nunca ocorre).
+# A3 exige pronunciamento ao fim da janela; como M_obs = M_dec = ∅,
+# o agente emite match_i automaticamente (janela vazia ≡ match trivial).
 # Esperado: ACEITA
 
 ab_i
 leave_ab_i
+match_i

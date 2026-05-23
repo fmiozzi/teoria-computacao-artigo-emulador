@@ -1,0 +1,26 @@
+---
+cenario: "OP errada no PLC — braço 2 produziu 1000L em vez de 2000L (Situação 3)"
+maquina: ROTO-01
+braco: 2
+m_dec: {caixa_2000L: 4}
+veredito_esperado: BOT
+---
+# Realidade física: o braço 2 produziu 4× caixa_1000L (porque os moldes
+# físicos eram para 1000L, ou setup térmico inadequado, ou troca de
+# moldes sem atualizar a OP). A OP C continua dizendo "4× caixa_2000L".
+# M_obs = {1000L:4}, M_dec = {2000L:4} → divergência total.
+#
+# O agente deveria emitir div_i ao final da janela. No trace abaixo ele
+# fica em silêncio — A3 captura.
+
+[t=     0] ab_i
+[t=  2000] rem_i
+[t=  2500] cls_p_i caixa_1000L 0.92
+[t=  4500] rem_i
+[t=  5000] cls_p_i caixa_1000L 0.94
+[t=  7000] rem_i
+[t=  7500] cls_p_i caixa_1000L 0.90
+[t=  9500] rem_i
+[t= 10000] cls_p_i caixa_1000L 0.93
+[t= 12000] leave_ab_i
+# silêncio: agente não se pronuncia (deveria emitir div_i)

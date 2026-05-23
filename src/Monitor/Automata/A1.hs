@@ -23,6 +23,7 @@ module Monitor.Automata.A1
   , initial
   , step
   , verdict
+  , finalVerdict
   , isViolation
   ) where
 
@@ -60,6 +61,11 @@ verdict :: M1 -> Verdict
 verdict m = case m1State m of
   M1Ok       -> Top
   M1Violated -> Bot
+
+-- | Para A1 (safety pura), o veredito final coincide com o veredito de
+-- stream — não há estado "pendente" a resolver.
+finalVerdict :: M1 -> Verdict
+finalVerdict = verdict
 
 -- | 'True' sse o autômato está em estado de sumidouro.
 isViolation :: M1 -> Bool

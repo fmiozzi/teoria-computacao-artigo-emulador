@@ -1,0 +1,21 @@
+---
+cenario: "Braço 1 com mix OP A (2× 1000L) + OP B (1× 2000L) + 1 molde vazio"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_1000L: 2, caixa_2000L: 1}
+veredito_esperado: TOP
+---
+# Cenário real de rotomoldagem multi-braço (Situação 1 do artigo).
+# Há 4 posições físicas: 2 caixas 1000L (OP A), 1 caixa 2000L (OP B),
+# 1 molde vazio para balanceamento (não dispara rem_i nem cls_p_i).
+# M_obs = {1000L:2, 2000L:1} = M_dec → match.
+
+[t=    0] ab_i
+[t= 1500] rem_i
+[t= 2000] cls_p_i caixa_1000L 0.93
+[t= 3500] rem_i
+[t= 4000] cls_p_i caixa_1000L 0.95
+[t= 5500] rem_i
+[t= 6000] cls_p_i caixa_2000L 0.88
+[t= 8000] leave_ab_i
+[t= 8000] match_i

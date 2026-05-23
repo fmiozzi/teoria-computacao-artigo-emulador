@@ -1,0 +1,28 @@
+---
+cenario: "Molde vazio esquecido no MES (Situação 2 do artigo)"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_1000L: 2, caixa_2000L: 2}
+veredito_esperado: BOT
+---
+# Realidade física: 2× 1000L + 1× 2000L + 1 molde vazio (idêntico ao
+# cenário 6). MAS o PCP esqueceu de declarar a posição vazia no MES.
+# M_dec efetivo = {1000L:2, 2000L:2}, M_obs = {1000L:2, 2000L:1}.
+#
+# Diante de M_obs ≠ M_dec, o agente DEVERIA emitir div_i ao final da
+# janela. No trace abaixo ele NÃO emite nem match_i nem div_i — silêncio
+# ao fim da janela, que é exatamente o que A3 captura (cenário 8 da
+# matriz de propriedades).
+#
+# A Peça 1 (só A1) aceitava este traço (falso negativo). A partir da
+# Fase 3, A3 vira esse falso negativo em violação correta.
+
+[t=    0] ab_i
+[t= 1500] rem_i
+[t= 2000] cls_p_i caixa_1000L 0.93
+[t= 3500] rem_i
+[t= 4000] cls_p_i caixa_1000L 0.95
+[t= 5500] rem_i
+[t= 6000] cls_p_i caixa_2000L 0.88
+[t= 8000] leave_ab_i
+# silêncio: agente não emite match_i nem div_i (falha de implementação)
