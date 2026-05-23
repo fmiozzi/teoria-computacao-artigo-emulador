@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancela runs antigos do mesmo branch quando há novo push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: nix build + cabal test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instala Nix com flakes habilitado
+        uses: cachix/install-nix-action@v25
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Cache do diretório Nix store (acelera reruns)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /nix/store
+            /nix/var/nix/profiles
+            ~/.cache/cabal
+          key: nix-store-${{ runner.os }}-${{ hashFiles('flake.lock', 'lab-monitor.cabal') }}
+          restore-keys: |
+            nix-store-${{ runner.os }}-
+
+      - name: cabal build (executable + library + tests)
+        run: |
+          nix develop --command cabal update
+          nix develop --command cabal build all
+
+      - name: cabal test
+        run: |
+          nix develop --command cabal test --test-show-details=streaming
+
+      - name: Smoke test do binário
+        run: |
+          nix develop --command cabal run -v0 lab-monitor -- --quiet \
+            Files/Traces/trace_01_aceita_simples.txt
+          nix develop --command cabal run -v0 lab-monitor -- --json \
+            Files/Traces/trace_08_viola_a4_molde_vazio.txt > /dev/null

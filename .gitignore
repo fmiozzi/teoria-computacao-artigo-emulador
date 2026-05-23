@@ -1,24 +1,34 @@
 # Build / compilação
 dist-newstyle/
 .stack-work/
+.ghc.environment.*
 *.o
 *.hi
 *.dyn_o
 *.dyn_hi
 
-# Binários gerados
+# Binários gerados (resultado de `nix build`)
 result
+result-*
+
+# Cache do Nix dev shell
+.direnv/
 
 # Temporários
 *.tmp
 *.bak
 *~
 
-# Ambiente
+# Variáveis de ambiente locais
 .env
 .env.local
 
-# Editor
-.vscode/
+# Editor — tudo do .vscode/ exceto settings.json (versionado)
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
+
+# Sistema
+.DS_Store
+Thumbs.db
