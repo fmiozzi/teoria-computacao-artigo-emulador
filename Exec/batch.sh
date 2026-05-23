@@ -29,7 +29,7 @@ ERROS=0
 
 for trace in "${TRACES[@]}"; do
   set +e
-  "$SCRIPT_DIR/monitor.sh" "$trace"
+  "$SCRIPT_DIR/monitor.sh" --quiet "$trace"
   rc=$?
   set -e
 

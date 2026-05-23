@@ -23,6 +23,8 @@ executable lab-monitor
       , Monitor.Automata.A4
       , Monitor.Composed
       , Output.Plain
+      , Output.Detailed
+      , Output.Json
     build-depends:
         base          >= 4.17 && < 5,
         text          >= 2.0,

@@ -40,6 +40,7 @@ module Monitor.Automata.A3
   , step
   , verdict
   , finalVerdict
+  , summary
   ) where
 
 import Monitor.Types (Event (..), Verdict (..))
@@ -78,3 +79,9 @@ finalVerdict m = case m3State m of
   M3Violated -> Bot
   M3Awaiting -> Bot
   M3Ok       -> Top
+
+summary :: M3 -> String
+summary m = case m3State m of
+  M3Ok        -> "ok"
+  M3Awaiting  -> "awaiting"
+  M3Violated  -> "viol"

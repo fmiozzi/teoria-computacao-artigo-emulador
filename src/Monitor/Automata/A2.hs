@@ -30,6 +30,7 @@ module Monitor.Automata.A2
   , step
   , verdict
   , finalVerdict
+  , summary
   ) where
 
 import Monitor.Types (Config (..), Event (..), TimedEvent (..), Verdict (..))
@@ -83,3 +84,9 @@ finalVerdict m = case m2State m of
   M2Violated  -> Bot
   M2Pending _ -> Bot
   M2Idle      -> Top
+
+summary :: M2 -> String
+summary m = case m2State m of
+  M2Idle           -> "idle"
+  M2Pending clock  -> "pending(x=" ++ show clock ++ ")"
+  M2Violated       -> "viol"

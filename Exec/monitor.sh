@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Executa o monitor LTL sobre um arquivo de traço.
+# Aceita as mesmas flags do executável: --quiet | --json.
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "Uso: $0 <arquivo_de_traço>"
+if [ "$#" -lt 1 ]; then
+  echo "Uso: $0 [--quiet|--json] <arquivo_de_traço>"
   echo ""
-  echo "Exemplo:"
-  echo "  $0 Files/Traces/trace_01_aceita_simples.txt"
+  echo "Exemplos:"
+  echo "  $0 Files/Traces/trace_01_aceita_simples.txt          # formato detalhado"
+  echo "  $0 --quiet Files/Traces/trace_01_aceita_simples.txt  # formato curto"
+  echo "  $0 --json  Files/Traces/trace_01_aceita_simples.txt  # JSON"
   exit 1
 fi
 
@@ -16,7 +19,7 @@ cd "$PROJECT_ROOT"
 
 # Se houver flake.nix no projeto, usa nix develop; caso contrário, cabal direto.
 if command -v nix >/dev/null 2>&1 && [ -f flake.nix ]; then
-  nix develop --command cabal run -v0 lab-monitor -- "$1"
+  nix develop --command cabal run -v0 lab-monitor -- "$@"
 else
-  cabal run -v0 lab-monitor -- "$1"
+  cabal run -v0 lab-monitor -- "$@"
 fi

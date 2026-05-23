@@ -25,6 +25,9 @@ module Monitor.Automata.A1
   , verdict
   , finalVerdict
   , isViolation
+  , summary
+  , m1State
+  , m1AbActive
   ) where
 
 import Monitor.Types (Event (..), Verdict (..))
@@ -70,3 +73,10 @@ finalVerdict = verdict
 -- | 'True' sse o autômato está em estado de sumidouro.
 isViolation :: M1 -> Bool
 isViolation m = m1State m == M1Violated
+
+-- | Descrição curta do estado para o output detalhado.
+summary :: M1 -> String
+summary m = case m1State m of
+  M1Ok       | m1AbActive m -> "ok(ab)"
+             | otherwise    -> "ok"
+  M1Violated                -> "viol"
