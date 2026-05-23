@@ -14,6 +14,7 @@ executable lab-monitor
     other-modules:
         Monitor.Types
       , Monitor.Parser
+      , Monitor.Header
       , Monitor.Multiset
       , Monitor.Automata.A1
       , Monitor.Composed

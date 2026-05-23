@@ -15,7 +15,7 @@ import           System.Environment (getArgs)
 import           System.Exit        (ExitCode (..), exitWith)
 import           System.IO          (hPutStrLn, stderr)
 
-import           Monitor.Parser     (parseTrace)
+import           Monitor.Parser     (parseFile)
 import           Monitor.Composed   (runMonitor)
 import           Monitor.Types      (Verdict (..))
 import           Output.Plain       (renderReport)
@@ -32,11 +32,11 @@ main = do
 processFile :: FilePath -> IO ()
 processFile filepath = do
   content <- TIO.readFile filepath
-  case parseTrace content of
+  case parseFile content of
     Left err -> do
       hPutStrLn stderr ("Erro ao parsear traço: " ++ err)
       exitWith (ExitFailure 1)
-    Right events -> do
+    Right (_hdr, events) -> do
       let (v, viol) = runMonitor events
       putStr (renderReport filepath (length events) v viol)
       case v of

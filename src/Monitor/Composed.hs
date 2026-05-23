@@ -16,7 +16,7 @@ module Monitor.Composed
   , runMonitor
   ) where
 
-import           Monitor.Types          (Event, Verdict (..))
+import           Monitor.Types          (Event, TimedEvent (..), Verdict (..))
 import qualified Monitor.Automata.A1 as A1
 
 -- | Estado do monitor composto.
@@ -46,12 +46,16 @@ verdict s = minimum
 
 -- | Roda o monitor evento a evento. Em caso de violação, retorna a
 -- posição (1-indexada) e o evento ofensor — útil para o output detalhado.
-runMonitor :: [Event] -> (Verdict, Maybe (Int, Event))
+--
+-- Recebe 'TimedEvent's mas, na Peça 1, descarta os timestamps; A2 e A4
+-- (Fases 4–5) passarão a usar 'teTime'.
+runMonitor :: [TimedEvent] -> (Verdict, Maybe (Int, Event))
 runMonitor = go 1 initial
   where
     go _ s [] = (verdict s, Nothing)
-    go i s (e : es) =
-      let s' = step s e
+    go i s (te : tes) =
+      let e  = teEvent te
+          s' = step s e
       in if verdict s' == Bot && verdict s /= Bot
            then (Bot, Just (i, e))
-           else go (i + 1) s' es
+           else go (i + 1) s' tes

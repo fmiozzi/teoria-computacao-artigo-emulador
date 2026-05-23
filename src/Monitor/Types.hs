@@ -12,9 +12,11 @@ module Monitor.Types
   ( -- * Eventos
     Event (..)
   , showEvent
+  , TimedEvent (..)
     -- * Veredito
   , Verdict (..)
   , showVerdict
+  , parseVerdict
     -- * Configuração
   , Config (..)
   , defaultConfig
@@ -37,10 +39,41 @@ data Event
   | Heartbeat            -- ^ heartbeat: sinal de vida do agente (A6)
   deriving (Eq, Show)
 
+-- | Evento com timestamp em milissegundos desde o início do traço.
+--
+-- Quando o arquivo de traço não traz timestamps explícitos, o parser
+-- atribui @i * 1000@ como tempo implícito, onde @i@ é o índice 0-based
+-- do evento na sequência (compatível com a Peça 1).
+data TimedEvent = TimedEvent
+  { teTime  :: !Int    -- ^ ms desde t=0
+  , teEvent :: !Event
+  } deriving (Eq, Show)
+
 -- | Veredito LTL_3 (Bauer, Leucker, Schallhart 2011).
 -- Ordem do reticulado: 'Bot' < 'Inconclusive' < 'Top'.
 data Verdict = Bot | Inconclusive | Top
   deriving (Eq, Ord, Show)
+
+-- | Inverso parcial de 'showVerdict' para tokens do cabeçalho YAML
+-- (case-insensitive). Aceita: @TOP@/@T@/@ACEITA@, @BOT@/@F@/@VIOLA@,
+-- @INCONCLUSIVE@/@?@. Útil para o campo @veredito_esperado@.
+parseVerdict :: String -> Either String Verdict
+parseVerdict s = case map toUpper (trim s) of
+  "TOP"          -> Right Top
+  "T"            -> Right Top
+  "ACEITA"       -> Right Top
+  "⊤"            -> Right Top
+  "BOT"          -> Right Bot
+  "F"            -> Right Bot
+  "VIOLA"        -> Right Bot
+  "⊥"            -> Right Bot
+  "INCONCLUSIVE" -> Right Inconclusive
+  "?"            -> Right Inconclusive
+  other          -> Left ("veredito desconhecido: " ++ other)
+  where
+    toUpper c | c >= 'a' && c <= 'z' = toEnum (fromEnum c - 32)
+              | otherwise            = c
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
 
 -- | Parâmetros do monitor (defaults definidos por 'defaultConfig').
 data Config = Config

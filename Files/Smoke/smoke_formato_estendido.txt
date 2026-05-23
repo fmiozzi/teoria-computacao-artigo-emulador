@@ -1,0 +1,21 @@
+---
+cenario: "Smoke test do formato estendido (Fase 2)"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_1000L: 2, caixa_2000L: 1}
+veredito_esperado: TOP
+---
+# Mistura de timestamps explícitos e implícitos.
+# Os eventos abaixo são o cenário canônico (aceito): braço entra na
+# janela, retira 3 peças com classificações dentro do prazo, sai da
+# janela com match.
+
+[t=0]    ab_i
+[t=1500] rem_i
+[t=2000] cls_p_i caixa_1000L 0.91
+[t=3500] rem_i
+4000     cls_p_i caixa_1000L 0.95
+[t=5500] rem_i
+6000     cls_p_i caixa_2000L 0.88
+[t=8000] leave_ab_i
+match_i
