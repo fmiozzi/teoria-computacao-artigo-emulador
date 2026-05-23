@@ -1,0 +1,26 @@
+---
+cenario: "Peça refugo — operador marca rej_i sem cls prévia"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_2000L: 4}
+veredito_esperado: BOT
+---
+# DEPENDÊNCIA: este traço requer A7 (Fase 10) — extensão proposta.
+# Enquanto A7 não estiver implementada, o parser também desconhece o
+# evento rej_i e este arquivo permanece em Files/Traces/_pending/
+# (fora do batch).
+#
+# Cenário (Cenário 4 da matriz de propriedades):
+#   A peça sai do molde com defeito (parede colapsada, bolha, queima).
+#   Operador retira, a CNN classifica corretamente o SKU, e logo em
+#   seguida o operador marca a peça como refugo (rej_i).
+#
+# A7: G(rej_i → ∃ recent cls_p_i)
+#   "Toda rejeição refere-se a uma classificação recente."
+#
+# Variação testada aqui: rej_i ocorre SEM cls_p_i prévia → viola A7.
+
+[t=    0] ab_i
+[t= 1000] rem_i
+[t= 1200] rej_i        # <- evento novo: refugo sem cls anterior
+[t= 3000] leave_ab_i

@@ -10,8 +10,12 @@ veredito_esperado: BOT
 # moldes sem atualizar a OP). A OP C continua dizendo "4× caixa_2000L".
 # M_obs = {1000L:4}, M_dec = {2000L:4} → divergência total.
 #
-# O agente deveria emitir div_i ao final da janela. No trace abaixo ele
-# fica em silêncio — A3 captura.
+# O agente não se pronuncia ao fim da janela. O mes-bridge (Fase 6)
+# injeta div_i; A3 fica satisfeita; A4 passa a exigir esc_pcp_i em
+# T_pcp, que não chega → viola A4 ao fim do traço.
+#
+# Histórico do veredito: Peça 1 aceitava; Fase 3 detectava A3; Fase 6
+# realoca a violação para A4.
 
 [t=     0] ab_i
 [t=  2000] rem_i

@@ -9,13 +9,16 @@ veredito_esperado: BOT
 # cenário 6). MAS o PCP esqueceu de declarar a posição vazia no MES.
 # M_dec efetivo = {1000L:2, 2000L:2}, M_obs = {1000L:2, 2000L:1}.
 #
-# Diante de M_obs ≠ M_dec, o agente DEVERIA emitir div_i ao final da
-# janela. No trace abaixo ele NÃO emite nem match_i nem div_i — silêncio
-# ao fim da janela, que é exatamente o que A3 captura (cenário 8 da
-# matriz de propriedades).
+# O agente NÃO emite match_i nem div_i ao fim da janela. O mes-bridge
+# do emulador (Fase 6) preenche essa lacuna injetando div_i no mesmo
+# timestamp do leave_ab_i. A3 fica satisfeita pelo div_i injetado;
+# em compensação, A4 (TLTL) passa a exigir esc_pcp_i em até T_pcp e o
+# trace termina sem essa escalação → viola A4 ao fim do traço.
 #
-# A Peça 1 (só A1) aceitava este traço (falso negativo). A partir da
-# Fase 3, A3 vira esse falso negativo em violação correta.
+# Histórico do veredito ao longo das peças:
+# - Peça 1 (só A1):  aceitava (falso negativo).
+# - Fase 3 (+ A3):   viola A3 (silêncio ao fim da janela).
+# - Fase 6 (mes-bridge): viola A4 (sem escalação ao PCP após div).
 
 [t=    0] ab_i
 [t= 1500] rem_i

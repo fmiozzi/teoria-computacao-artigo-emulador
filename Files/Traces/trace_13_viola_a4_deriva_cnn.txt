@@ -1,0 +1,37 @@
+---
+cenario: "Deriva da CNN — todas as classificações com confiança < τ"
+maquina: ROTO-01
+braco: 2
+m_dec: {caixa_2000L: 4}
+veredito_esperado: BOT
+---
+# Câmera suja ou modelo desatualizado: todas as cls têm conf < τ=0.85.
+# A5 (filtro de confiança) descarta cada cls; M_obs permanece vazio.
+#
+# Consequências encadeadas (composição):
+# - A2 fica em Pending desde o primeiro rem_i (nenhuma cls aceita
+#   resolve a pendência). No fim do traço A2 viola — finalVerdict ⊥.
+# - O mes-bridge ao chegar em leave_ab_i compara M_obs=∅ com
+#   M_dec={2000L:4}, detecta divergência e injeta div_i. A3 satisfeita.
+# - A4 passa a exigir esc_pcp_i em T_pcp. O trace termina sem ele →
+#   A4 também viola.
+#
+# Esse cenário ilustra como múltiplas propriedades capturam a mesma
+# causa raiz por ângulos diferentes (A2 vê o atraso da classificação;
+# A4 vê a falta de escalação). A causa real — "CNN ineficaz" — é uma
+# métrica observacional fora do escopo LTL (Cenário 9 da matriz).
+#
+# Veredito_esperado: ⊥ (composto). Regras esperadas: A2 + A4.
+
+[t=    0] ab_i
+[t= 1000] rem_i
+[t= 1200] cls_p_i caixa_2000L 0.42
+[t= 3000] rem_i
+[t= 3200] cls_p_i caixa_2000L 0.38
+[t= 5000] rem_i
+[t= 5200] cls_p_i caixa_2000L 0.51
+[t= 7000] rem_i
+[t= 7200] cls_p_i caixa_2000L 0.49
+[t= 9000] leave_ab_i
+# nada após — mes-bridge injeta div_i (M_obs=∅ ≠ M_dec) e A4
+# espera esc_pcp_i; fim do traço → viola A4 (e A2 do início).

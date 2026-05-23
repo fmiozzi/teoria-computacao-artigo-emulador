@@ -1,0 +1,36 @@
+---
+cenario: "Janela longa demais — operador parou no meio (34 min)"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_2000L: 4}
+veredito_esperado: BOT
+---
+# DEPENDÊNCIA: este traço requer A8 (Fase 10) — extensão proposta.
+# Até lá, o monitor atual aceita o traço (todas as outras propriedades
+# ficam satisfeitas, A8 não existe).
+#
+# Cenário (Cenário 5 da matriz de propriedades):
+#   O braço chega à estação, o operador inicia o desmolde, e é
+#   interrompido (banheiro, almoço, supervisor). A janela fica aberta
+#   por 34 min quando o ciclo normal é ~8 min. Cada retirada individual
+#   está correta e classificada dentro de T_cls; o agente até emite
+#   match_i ao final. Mas a janela longa paralisa os outros braços do
+#   carrossel (forno compartilhado).
+#
+# A8: G(ab_i → F_[0, T_ab_max] leave_ab_i)
+#   "A janela de abastecimento deve fechar em até T_ab_max."
+#   Default T_ab_max = 900000 ms = 15 min.
+#
+# Aqui ab_i em t=0 e leave_ab_i em t=2040000 (34 min) → viola A8.
+
+[t=       0] ab_i
+[t=  120000] rem_i
+[t=  120500] cls_p_i caixa_2000L 0.91
+[t=  240000] rem_i
+[t=  240500] cls_p_i caixa_2000L 0.93
+[t= 1800000] rem_i                          # 30 min depois do início
+[t= 1800500] cls_p_i caixa_2000L 0.92
+[t= 1920000] rem_i
+[t= 1920500] cls_p_i caixa_2000L 0.90
+[t= 2040000] leave_ab_i                     # 34 min após ab_i
+[t= 2040000] match_i
