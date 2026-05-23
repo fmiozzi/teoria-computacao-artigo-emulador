@@ -1,0 +1,26 @@
+---
+cenario: "Escalação atrasada — gap > T_pcp entre div_i e esc_pcp_i"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_2000L: 2}
+veredito_esperado: BOT
+---
+# O agente detecta corretamente divergência ao final da janela
+# (M_obs = {2000L:1} ≠ M_dec = {2000L:2}, faltando 1 peça) e emite
+# div_i em t=4500 ms. PORÉM, a escalação ao PCP só chega em t=305000
+# ms — gap de 300500 ms, acima do T_pcp configurado (300000 ms = 5 min).
+#
+# A4 detecta isso assim que um evento ultrapassa o prazo. No caso
+# abaixo, o próprio esc_pcp_i atrasado é o evento que dispara o
+# sumidouro de M4 — chegou tarde demais.
+#
+# Demais propriedades: A1 ok (rem dentro da janela); A2 ok (cls em
+# T_cls); A3 ok (div_i pronunciado após leave); A5 ok (conf 0.92 ≥ τ).
+# Ínfimo composto = ⊥, puxado por A4.
+
+[t=      0] ab_i
+[t=   2000] rem_i
+[t=   2500] cls_p_i caixa_2000L 0.92
+[t=   4500] leave_ab_i
+[t=   4500] div_i
+[t= 305000] esc_pcp_i

@@ -19,6 +19,7 @@ executable lab-monitor
       , Monitor.Automata.A1
       , Monitor.Automata.A2
       , Monitor.Automata.A3
+      , Monitor.Automata.A4
       , Monitor.Composed
       , Output.Plain
     build-depends:
