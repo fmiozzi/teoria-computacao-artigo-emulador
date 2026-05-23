@@ -1,6 +1,9 @@
-# Violacao de A1 - rem_i ocorre ANTES de ab_i
-# (peça retirada antes da janela de abastecimento abrir)
-# Esperado: VIOLA na posição #1
+---
+cenario: "Violação A1 — rem_i ocorre antes de ab_i"
+veredito_esperado: BOT
+---
+# Peça retirada antes da janela de abastecimento abrir.
+# Esperado: VIOLA na posição #1.
 
 rem_i
 ab_i

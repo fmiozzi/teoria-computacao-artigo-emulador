@@ -1,6 +1,9 @@
-# Traço de aceitação — múltiplas peças retiradas em sequência dentro da janela
-# (cenário típico de um braço com vários moldes)
-# Esperado: ACEITA
+---
+cenario: "Aceitação — múltiplas peças retiradas em sequência dentro da janela"
+veredito_esperado: TOP
+---
+# Cenário típico de um braço com vários moldes.
+# Esperado: ACEITA.
 
 ab_i
 rem_i

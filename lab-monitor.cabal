@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               lab-monitor
-version:            0.1.0.0
+version:            0.6.0.0
 synopsis:           Monitor LTL/TLTL para verificação em tempo de execução
                     de propriedades operacionais de um agente de visão
                     computacional em manufatura
@@ -8,10 +8,14 @@ author:             Flávio Miozzi Batista
 maintainer:         fmiozzi@gmail.com
 build-type:         Simple
 
-executable lab-monitor
-    main-is:          Main.hs
+common warnings
+    ghc-options:    -Wall -Wincomplete-patterns -Wincomplete-uni-patterns
+    default-language: Haskell2010
+
+library
+    import:           warnings
     hs-source-dirs:   src
-    other-modules:
+    exposed-modules:
         Monitor.Types
       , Monitor.Parser
       , Monitor.Header
@@ -29,5 +33,33 @@ executable lab-monitor
         base          >= 4.17 && < 5,
         text          >= 2.0,
         containers    >= 0.6
-    default-language: Haskell2010
-    ghc-options:      -Wall -Wincomplete-patterns -Wincomplete-uni-patterns
+
+executable lab-monitor
+    import:           warnings
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    build-depends:
+        base,
+        text,
+        lab-monitor
+
+test-suite lab-monitor-test
+    import:           warnings
+    type:             exitcode-stdio-1.0
+    main-is:          Spec.hs
+    hs-source-dirs:   test
+    other-modules:
+        ExampleTraces
+      , CompositionProps
+      , AbsorbingProps
+    build-depends:
+        base,
+        text,
+        containers,
+        directory,
+        filepath,
+        tasty            >= 1.4,
+        tasty-hunit      >= 0.10,
+        tasty-quickcheck >= 0.10,
+        QuickCheck       >= 2.14,
+        lab-monitor

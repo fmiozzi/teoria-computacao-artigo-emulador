@@ -1,5 +1,9 @@
-# Traço de aceitação — uma peça retirada dentro da janela de abastecimento
-# Esperado: ACEITA
+---
+cenario: "Aceitação canônica — uma peça retirada dentro da janela"
+veredito_esperado: TOP
+---
+# Cenário simples: ab_i, rem_i, classificação, leave_ab_i, match_i.
+# Esperado: ACEITA.
 
 ab_i
 rem_i

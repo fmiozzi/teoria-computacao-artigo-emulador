@@ -39,15 +39,16 @@ main = do
     Right (mode, filepath) -> processFile mode filepath
 
 parseArgs :: [String] -> Either String (Mode, FilePath)
-parseArgs = go ModeDetailed []
+parseArgs = go ModeDetailed
   where
-    go _    _    []                  = Left "esperado um arquivo de traço"
-    go _    _    ("-h":_)            = Left "help"
-    go _    _    ("--help":_)        = Left "help"
-    go _    flags ("--quiet":xs)     = go ModeQuiet (flags ++ ["--quiet"]) xs
-    go _    flags ("--json":xs)      = go ModeJson  (flags ++ ["--json"]) xs
-    go m    _    [fp]                = Right (m, fp)
-    go _    _    (x:_)               = Left ("argumento desconhecido: " ++ x)
+    go :: Mode -> [String] -> Either String (Mode, FilePath)
+    go _ []             = Left "esperado um arquivo de traço"
+    go _ ("-h":_)       = Left "help"
+    go _ ("--help":_)   = Left "help"
+    go _ ("--quiet":xs) = go ModeQuiet xs
+    go _ ("--json":xs)  = go ModeJson  xs
+    go m [fp]           = Right (m, fp)
+    go _ (x:_)          = Left ("argumento desconhecido: " ++ x)
 
 usage :: String -> IO ()
 usage msg = do

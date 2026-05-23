@@ -25,10 +25,6 @@ module Output.Json
 
 import qualified Data.Map.Strict      as Map
 import qualified Data.Text            as T
-import qualified Monitor.Automata.A1  as A1
-import qualified Monitor.Automata.A2  as A2
-import qualified Monitor.Automata.A3  as A3
-import qualified Monitor.Automata.A4  as A4
 import           Monitor.Composed     (ComposedState (..), Step (..), summary)
 import           Monitor.Header       (TraceHeader (..))
 import           Monitor.Multiset     (Multiset)
@@ -125,13 +121,13 @@ renderJValue _ (JStr s)  = '"' : escape s ++ "\""
 renderJValue _ (JInt n)  = show n
 renderJValue _ (JDbl d)  = show d
 renderJValue _ JNull     = "null"
-renderJValue d (JArr []) = "[]"
+renderJValue _ (JArr []) = "[]"
 renderJValue d (JArr xs) =
   "[\n"
   ++ indent (d + 1)
   ++ intercalateStr (",\n" ++ indent (d + 1)) (map (renderJValue (d + 1)) xs)
   ++ "\n" ++ indent d ++ "]"
-renderJValue d (JObj []) = "{}"
+renderJValue _ (JObj []) = "{}"
 renderJValue d (JObj fs) =
   "{\n"
   ++ indent (d + 1)

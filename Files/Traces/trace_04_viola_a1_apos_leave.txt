@@ -1,6 +1,10 @@
-# Violacao de A1 - rem_i ocorre APOS leave_ab_i
-# (operador tenta retirar peça depois do fim da janela)
-# Esperado: VIOLA na posição #4
+---
+cenario: "Violação A1 — rem_i ocorre após leave_ab_i"
+veredito_esperado: BOT
+---
+# Operador tenta retirar peça depois do fim da janela. Esperado:
+# VIOLA na posição #4 — A1 e A3 disparam simultaneamente (rem_i é
+# fora da janela E não é match/div para A3 em Awaiting).
 
 ab_i
 rem_i
