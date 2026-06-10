@@ -2,8 +2,9 @@
 cenario: "Deriva da CNN — todas as classificações com confiança < τ"
 maquina: ROTO-01
 braco: 2
-m_dec: {caixa_2000L: 4}
+m_dec: {caixa_500L: 4}
 veredito_esperado: BOT
+status_esperado: erro_classificacao
 ---
 # Câmera suja ou modelo desatualizado: todas as cls têm conf < τ=0.85.
 # A5 (filtro de confiança) descarta cada cls; M_obs permanece vazio.
@@ -25,13 +26,13 @@ veredito_esperado: BOT
 
 [t=    0] ab_i
 [t= 1000] rem_i
-[t= 1200] cls_p_i caixa_2000L 0.42
+[t= 1200] cls_p_i caixa_500L 0.42
 [t= 3000] rem_i
-[t= 3200] cls_p_i caixa_2000L 0.38
+[t= 3200] cls_p_i caixa_500L 0.38
 [t= 5000] rem_i
-[t= 5200] cls_p_i caixa_2000L 0.51
+[t= 5200] cls_p_i caixa_500L 0.51
 [t= 7000] rem_i
-[t= 7200] cls_p_i caixa_2000L 0.49
+[t= 7200] cls_p_i caixa_500L 0.49
 [t= 9000] leave_ab_i
 # nada após — mes-bridge injeta div_i (M_obs=∅ ≠ M_dec) e A4
 # espera esc_pcp_i; fim do traço → viola A4 (e A2 do início).

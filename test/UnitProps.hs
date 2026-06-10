@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Testes unitários (HUnit) das peças de baixo nível: filtro A5
--- ('Monitor.Classification'), multiconjuntos ('Monitor.Multiset') e os
--- relógios dos autômatos temporizados A2, A3 e A4 (casos de borda
--- x = T vs x > T).
+-- | Testes unitários (HUnit) das peças de baixo nível do monitor
+-- verificado (A1–A3 + A5): filtro A5 ('Monitor.Classification'),
+-- multiconjuntos ('Monitor.Multiset') e os relógios dos autômatos
+-- temporizados A2 e A3 (casos de borda x = T vs x > T). A4 é extensão
+-- prospectiva (§6) e não integra a suíte do recorte verificado.
 module UnitProps (tests) where
 
 import qualified Data.Map.Strict        as Map
@@ -14,21 +15,17 @@ import           Monitor.Classification (filterByTau, isValidCls)
 import qualified Monitor.Multiset       as MS
 import qualified Monitor.Automata.A2    as A2
 import qualified Monitor.Automata.A3    as A3
-import qualified Monitor.Automata.A4    as A4
 import           Monitor.Types
 
 -- | Config com prazos curtos para exercitar os relógios.
 cfg :: Config
-cfg = defaultConfig { cfgTcls = 2000, cfgTdec = 2000, cfgTpcp = 2000, cfgTau = 0.85 }
+cfg = defaultConfig { cfgTcls = 2000, cfgTdec = 2000, cfgTau = 0.85 }
 
 runA2 :: [TimedEvent] -> A2.M2
 runA2 = foldl A2.step (A2.initial cfg)
 
 runA3 :: [TimedEvent] -> A3.M3
 runA3 = foldl A3.step (A3.initial cfg)
-
-runA4 :: [TimedEvent] -> A4.M4
-runA4 = foldl A4.step (A4.initial cfg)
 
 te :: Int -> Event -> TimedEvent
 te = TimedEvent
@@ -78,14 +75,6 @@ tests = testGroup "UnitProps"
         A3.verdict (runA3 [te 0 AbI, te 1000 LeaveAbI, te 3001 MatchI]) @?= Bot
     , testCase "leave sem decisão até o fim viola" $
         A3.finalVerdict (runA3 [te 0 AbI, te 1000 LeaveAbI]) @?= Bot
-    ]
-  , testGroup "A4 (relógio T_pcp)"
-    [ testCase "esc_pcp dentro de T_pcp satisfaz" $
-        A4.finalVerdict (runA4 [te 0 DivI, te 1000 EscPcpI]) @?= Top
-    , testCase "esc_pcp após T_pcp viola (x > T_pcp)" $
-        A4.verdict (runA4 [te 0 DivI, te 3001 EscPcpI]) @?= Bot
-    , testCase "div sem escalação até o fim viola" $
-        A4.finalVerdict (runA4 [te 0 DivI]) @?= Bot
     ]
   ]
 

@@ -3,13 +3,15 @@
 -- | Autômato M2 — propriedade A2 (liveness temporizada, TLTL) do artigo (v2):
 --
 -- @
---   A2 : G(leave_ab_i → F_{[0, T_cls]} ∨_{j∈M, p∈P} cls_{p,i,j}^{≥τ})
+--   A2 : G((leave_ab_i ∧ houve_rem_i) → F_{[0, T_cls]} ⋁_{j∈M, p∈P} cls_{p,i,j}^{≥τ})
 -- @
 --
--- "Ao encerrar a janela de abastecimento (leave_ab_i), deve existir ao
--- menos uma classificação válida (confiança ≥ τ) dentro de T_cls
--- unidades de tempo." A ancoragem temporal é o /encerramento da janela/,
--- não a retirada individual (cf. fig-automato-a2-tltl, caption v2).
+-- "Em janelas com ao menos uma retirada (guarda houve_rem_i), ao encerrar
+-- a janela de abastecimento (leave_ab_i) deve existir ao menos uma
+-- classificação válida (confiança ≥ τ, filtro A5) acumulada no intervalo
+-- [τ_a, τ_b + T_cls]." A ancoragem temporal é o /encerramento da janela/,
+-- não a retirada individual (§4, Figura 5). Janelas inertes (sem retirada)
+-- satisfazem A2 vacuamente.
 --
 -- Modelado com 3 estados:
 --
@@ -32,6 +34,7 @@ module Monitor.Automata.A2
   , step
   , verdict
   , finalVerdict
+  , isViolation
   , summary
   ) where
 
@@ -102,18 +105,27 @@ step m (TimedEvent now evt) = case m2State m of
         -- Demais eventos (inclusive cls com conf < τ) não alteram.
         _                              -> m
 
+-- | Veredito de /stream/ (LTL₃). A2' é bounded liveness realizada como
+-- safety (§5.3): sobre prefixo finito o ⊤ não é alcançável, logo o domínio
+-- é {⊥, ?}. Em 'M2Idle' ou 'M2Pending' o veredito é ? ("a obrigação ainda
+-- pode ser resgatada dentro de T_cls"); ao expirar o relógio, ⊥.
 verdict :: M2 -> Verdict
 verdict m = case m2State m of
   M2Violated -> Bot
-  _          -> Top
+  _          -> Inconclusive
 
--- | Em 'M2Pending' ao fim do traço também viola — a obrigação F[…]
--- não foi cumprida dentro do horizonte observado.
+-- | Veredito /terminal/. Em 'M2Pending' ao fim do traço a obrigação
+-- F_{[0,T_cls]} não foi cumprida no horizonte observado → ⊥; 'M2Idle'
+-- (sem obrigação pendente) → ⊤.
 finalVerdict :: M2 -> Verdict
 finalVerdict m = case m2State m of
   M2Violated  -> Bot
   M2Pending _ -> Bot
   M2Idle      -> Top
+
+-- | 'True' sse M₂ está no sumidouro de violação (promove timeout_cls_i).
+isViolation :: M2 -> Bool
+isViolation m = m2State m == M2Violated
 
 summary :: M2 -> String
 summary m = case m2State m of

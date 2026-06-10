@@ -2,7 +2,7 @@
 cenario: "Agente morto — gap > T_h entre heartbeats"
 maquina: ROTO-01
 braco: 2
-m_dec: {caixa_2000L: 2}
+m_dec: {caixa_500L: 2}
 veredito_esperado: BOT
 ---
 # Cenário 6 da matriz de propriedades (agente "morto"):
@@ -25,8 +25,8 @@ veredito_esperado: BOT
 [t=  3000] heartbeat
 [t= 13000] heartbeat            # gap de 10 s — viola A6 (T_h = 5 s)
 [t= 14000] rem_i
-[t= 14500] cls_p_i caixa_2000L 0.92
+[t= 14500] cls_p_i caixa_500L 0.92
 [t= 16000] rem_i
-[t= 16500] cls_p_i caixa_2000L 0.94
+[t= 16500] cls_p_i caixa_500L 0.94
 [t= 18000] leave_ab_i
 [t= 18000] match_i

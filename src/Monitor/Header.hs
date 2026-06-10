@@ -32,7 +32,7 @@ import qualified Data.Map.Strict     as Map
 import           Data.Map.Strict     (Map)
 import qualified Data.Text           as T
 import           Monitor.Multiset    (Multiset)
-import           Monitor.Types       (Config (..), Verdict, parseVerdict)
+import           Monitor.Types       (Config (..), MesStatus, Verdict, parseStatus, parseVerdict)
 
 -- | Campos extraídos do cabeçalho YAML. Todos opcionais — um traço
 -- válido pode dispensar o cabeçalho inteiro.
@@ -46,12 +46,13 @@ data TraceHeader = TraceHeader
   , thMaquina  :: Maybe T.Text
   , thBraco    :: Maybe Int
   , thMdec     :: Maybe Multiset
-  , thExpected :: Maybe Verdict
+  , thExpected :: Maybe Verdict        -- ^ @veredito_esperado@: veredito composto (Proposição 2)
+  , thStatus   :: Maybe MesStatus      -- ^ @status_esperado@: status terminal do gate (§5.4)
   , thParams   :: Maybe (Map T.Text Double)
   } deriving (Eq, Show)
 
 emptyHeader :: TraceHeader
-emptyHeader = TraceHeader Nothing Nothing Nothing Nothing Nothing Nothing
+emptyHeader = TraceHeader Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 -- | Parseia o miolo do cabeçalho (sem os marcadores @---@). Linhas
 -- vazias e comentários (@#@) são ignorados; chaves desconhecidas são
@@ -81,6 +82,7 @@ applyEntry h k v = case k of
   "m_dec"             -> (\m -> h { thMdec  = Just m }) <$> parseFlowMap v
   "parametros"        -> (\m -> h { thParams = Just m }) <$> parseFlowMapDouble v
   "veredito_esperado" -> (\d -> h { thExpected = Just d }) <$> parseVerdict (T.unpack v)
+  "status_esperado"   -> (\st -> h { thStatus = Just st }) <$> parseStatus (T.unpack (unquote v))
   _                   -> Right h   -- ignora chaves desconhecidas
 
 -- | Remove aspas duplas envolventes (se houver). Strings YAML sem aspas

@@ -2,7 +2,7 @@
 cenario: "Janela longa demais — operador parou no meio (34 min)"
 maquina: ROTO-01
 braco: 1
-m_dec: {caixa_2000L: 4}
+m_dec: {caixa_500L: 4}
 veredito_esperado: BOT
 ---
 # Cenário 5 da matriz de propriedades (janela longa demais):
@@ -21,12 +21,12 @@ veredito_esperado: BOT
 
 [t=       0] ab_i
 [t=  120000] rem_i
-[t=  120500] cls_p_i caixa_2000L 0.91
+[t=  120500] cls_p_i caixa_500L 0.91
 [t=  240000] rem_i
-[t=  240500] cls_p_i caixa_2000L 0.93
+[t=  240500] cls_p_i caixa_500L 0.93
 [t= 1800000] rem_i                          # 30 min depois do início
-[t= 1800500] cls_p_i caixa_2000L 0.92
+[t= 1800500] cls_p_i caixa_500L 0.92
 [t= 1920000] rem_i
-[t= 1920500] cls_p_i caixa_2000L 0.90
+[t= 1920500] cls_p_i caixa_500L 0.90
 [t= 2040000] leave_ab_i                     # 34 min após ab_i
 [t= 2040000] match_i

@@ -2,12 +2,13 @@
 cenario: "OP errada no PLC — braço 2 produziu 1000L em vez de 2000L (Situação 3)"
 maquina: ROTO-01
 braco: 2
-m_dec: {caixa_2000L: 4}
-veredito_esperado: BOT
+m_dec: {caixa_500L: 4}
+veredito_esperado: TOP
+status_esperado: divergencia_pcp
 ---
 # Realidade física: o braço 2 produziu 4× caixa_1000L (porque os moldes
 # físicos eram para 1000L, ou setup térmico inadequado, ou troca de
-# moldes sem atualizar a OP). A OP C continua dizendo "4× caixa_2000L".
+# moldes sem atualizar a OP). A OP C continua dizendo "4× caixa_500L".
 # M_obs = {1000L:4}, M_dec = {2000L:4} → divergência total.
 #
 # O agente não se pronuncia ao fim da janela. O mes-bridge (Fase 6)

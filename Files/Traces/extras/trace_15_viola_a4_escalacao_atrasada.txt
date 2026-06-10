@@ -2,7 +2,7 @@
 cenario: "Escalação atrasada — gap > T_pcp entre div_i e esc_pcp_i"
 maquina: ROTO-01
 braco: 1
-m_dec: {caixa_2000L: 2}
+m_dec: {caixa_500L: 2}
 veredito_esperado: BOT
 ---
 # O agente detecta corretamente divergência ao final da janela
@@ -20,7 +20,7 @@ veredito_esperado: BOT
 
 [t=      0] ab_i
 [t=   2000] rem_i
-[t=   2500] cls_p_i caixa_2000L 0.92
+[t=   2500] cls_p_i caixa_500L 0.92
 [t=   4500] leave_ab_i
 [t=   4500] div_i
 [t= 305000] esc_pcp_i

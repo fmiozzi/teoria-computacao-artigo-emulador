@@ -6,10 +6,11 @@
 -- 'Violated' como sumidouro absorvente.
 --
 -- /Não/ vale o mesmo para 'finalVerdict' isoladamente: estados como
--- 'M3Awaiting' ou 'M4Pending' têm 'finalVerdict' = ⊥ mas podem
--- /sair/ desse estado num step posterior. Por isso a propriedade
--- da absorção é, formalmente, do veredito de stream — e o que
--- garantimos no terminal é a implicação "stream ⊥ ⇒ terminal ⊥".
+-- 'M2Pending' ou 'M3Pending' têm 'finalVerdict' = ⊥ mas podem /sair/
+-- desse estado num step posterior (classificação/decisão tardia dentro do
+-- prazo). Por isso a propriedade da absorção é, formalmente, do veredito
+-- de stream — e o que garantimos no terminal é a implicação
+-- "stream ⊥ ⇒ terminal ⊥".
 module AbsorbingProps (tests) where
 
 import           Test.Tasty             (TestTree, testGroup)

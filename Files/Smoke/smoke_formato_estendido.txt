@@ -2,7 +2,7 @@
 cenario: "Smoke test do formato estendido (Fase 2)"
 maquina: ROTO-01
 braco: 1
-m_dec: {caixa_1000L: 2, caixa_2000L: 1}
+m_dec: {caixa_1000L: 2, caixa_500L: 1}
 veredito_esperado: TOP
 ---
 # Mistura de timestamps explícitos e implícitos.
@@ -16,6 +16,6 @@ veredito_esperado: TOP
 [t=3500] rem_i
 4000     cls_p_i caixa_1000L 0.95
 [t=5500] rem_i
-6000     cls_p_i caixa_2000L 0.88
+6000     cls_p_i caixa_500L 0.88
 [t=8000] leave_ab_i
 match_i

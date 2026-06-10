@@ -63,15 +63,23 @@ step m evt = case m1State m of
       | otherwise    -> m { m1State = M1Violated }
     _        -> m
 
+-- | Veredito de /stream/ (LTL₃). A1 é safety não-co-safety: sobre prefixo
+-- finito o veredito ⊤ não é alcançável (qualquer prolongamento pode
+-- violar), de modo que o domínio é {⊥, ?} (§2.3, §5.3). Enquanto o
+-- autômato não atinge o sumidouro, o veredito é ? ("ainda não há violação,
+-- mas ainda pode haver"); ao atingir o sumidouro, ⊥.
 verdict :: M1 -> Verdict
 verdict m = case m1State m of
-  M1Ok       -> Top
+  M1Ok       -> Inconclusive
   M1Violated -> Bot
 
--- | Para A1 (safety pura), o veredito final coincide com o veredito de
--- stream — não há estado "pendente" a resolver.
+-- | Veredito /terminal/. Ao encerrar o prefixo observado, A1 (safety sem
+-- obrigação pendente) é aceita (⊤) se nunca atingiu o sumidouro; ⊥ caso
+-- contrário.
 finalVerdict :: M1 -> Verdict
-finalVerdict = verdict
+finalVerdict m = case m1State m of
+  M1Ok       -> Top
+  M1Violated -> Bot
 
 -- | 'True' sse o autômato está em estado de sumidouro.
 isViolation :: M1 -> Bool

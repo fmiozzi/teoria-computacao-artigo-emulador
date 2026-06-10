@@ -2,7 +2,7 @@
 cenario: "Peça refugo — operador marca rej_i sem cls prévia"
 maquina: ROTO-01
 braco: 1
-m_dec: {caixa_2000L: 4}
+m_dec: {caixa_500L: 4}
 veredito_esperado: BOT
 ---
 # Cenário 4 da matriz de propriedades (refugo de peça):

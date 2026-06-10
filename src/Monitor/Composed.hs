@@ -1,42 +1,42 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Produto sincronizado dos autômatos de monitoramento — o monitor
--- composto M = M_1 ⊗ M_2 ⊗ M_3 ⊗ M_4 do artigo (v2).
+-- composto @M = M₁ ⊗ M₂ ⊗ M₃@ do artigo v2_3 (§5.2).
+--
+-- São TRÊS componentes (A1 safety, A2′ e A3′ bounded liveness). A
+-- propriedade A4 (escalonamento ao PCP) é extensão prospectiva (§6) e
+-- /não/ integra o produto — a escalada ao PCP é ação determinística do
+-- gate (§5.4), não obrigação verificada por autômato.
 --
 -- O veredito composto é o ínfimo dos vereditos individuais no reticulado
--- ⊥ < ? < ⊤. Como ⊥ é absorvente em cada componente, basta o autômato
--- individual mais pessimista para determinar o veredito composto.
+-- ⊥ < ? < ⊤ (Proposição 2). Como ⊥ é absorvente em cada componente, basta
+-- o autômato mais pessimista para determinar o veredito composto. O
+-- /stream/ opera em {⊥, ?} e o /terminal/ em {⊥, ⊤} (§5.3).
 --
--- /Eventos derivados/: o sumidouro de M_2 (timeout_cls_i) e o de M_3
--- (leave_ab_silent_i) são disjuntos de @div_i@ (cf. definição de div_i no
--- artigo). Quando M_2 ou M_3 viola por expiração de relógio, esta
--- composição promove um @div_i@ sintético no mesmo instante, armando M_4
--- (escalação ao PCP).
---
--- As propriedades A6/A7/A8 são extensões de trabalho futuro (artigo §6) e
--- /não/ fazem parte do monitor composto da v2 — vivem em
--- "Monitor.Automata.A6"/"A7"/"A8" isoladas.
+-- Este módulo é puramente o produto declarativo: ele NÃO fabrica match/div
+-- (papel do mes-bridge) nem promove sumidouros a status (papel do gate,
+-- "Monitor.Gate"). O macro-evento derivado div_i (§3.4) é consumido por M₃
+-- como qualquer outra letra.
 module Monitor.Composed
   ( -- * Estado
     ComposedState (..)
   , initial
   , step
-    -- * Vereditos
+    -- * Vereditos (Proposição 2: ínfimo)
   , verdict
   , finalVerdict
   , violatingRules
   , finalViolatingRules
+    -- * Sumidouros por componente (consumidos pelo gate)
+  , sinkM1
+  , sinkM2
+  , sinkM3
   , summary
-    -- * Execução
-  , Step (..)
-  , runMonitor
-  , runMonitorTrace
   ) where
 
 import qualified Monitor.Automata.A1 as A1
 import qualified Monitor.Automata.A2 as A2
 import qualified Monitor.Automata.A3 as A3
-import qualified Monitor.Automata.A4   as A4
 import           Monitor.Classification (isValidCls)
 import qualified Monitor.Multiset    as MS
 import           Monitor.Multiset    (Multiset)
@@ -50,8 +50,7 @@ data ComposedState = ComposedState
   { csM1   :: !A1.M1
   , csM2   :: !A2.M2
   , csM3   :: !A3.M3
-  , csM4   :: !A4.M4
-  , csObs  :: !Multiset
+  , csObs  :: !Multiset   -- ^ multiconjunto observado da janela corrente (A5), só para exibição
   , csTau  :: !Double
   } deriving (Eq, Show)
 
@@ -60,122 +59,68 @@ initial cfg = ComposedState
   { csM1  = A1.initial
   , csM2  = A2.initial cfg
   , csM3  = A3.initial cfg
-  , csM4  = A4.initial cfg
   , csObs = MS.empty
   , csTau = cfgTau cfg
   }
 
+-- | Passo do produto sincronizado sobre um evento. Cada componente
+-- consome o evento via sua própria função de transição. @csObs@ acumula as
+-- classificações confiáveis (filtro A5) da janela corrente, reiniciando a
+-- cada @ab_i@ — é informação de exibição; a comparação multiconjunto
+-- M_obs vs M_dec é responsabilidade do gate.
 step :: ComposedState -> TimedEvent -> ComposedState
 step s te =
   let evt  = teEvent te
-      now  = teTime te
-      -- M_obs acumula apenas classificações confiáveis (filtro A5).
       obs' = case evt of
-        ClsPI sku _
-          | isValidCls (csTau s) evt -> MS.addCls sku (csObs s)
-          | otherwise                -> csObs s
-        _ -> csObs s
-      m1' = A1.step (csM1 s) evt
-      m2' = A2.step (csM2 s) te
-      m3' = A3.step (csM3 s) te
-      -- div_i sintético: timeout de M_2 (timeout_cls_i) ou de M_3
-      -- (leave_ab_silent_i) arma M_4 no mesmo instante.
-      a2JustViolated = A2.verdict m2' == Bot && A2.verdict (csM2 s) /= Bot
-      a3JustViolated = A3.verdict m3' == Bot && A3.verdict (csM3 s) /= Bot
-      m4Base = A4.step (csM4 s) te
-      m4' | a2JustViolated || a3JustViolated = A4.step m4Base (TimedEvent now DivI)
-          | otherwise                        = m4Base
+        AbI                                    -> MS.empty
+        ClsPI sku _ | isValidCls (csTau s) evt -> MS.addCls sku (csObs s)
+        _                                      -> csObs s
   in s
-    { csM1  = m1'
-    , csM2  = m2'
-    , csM3  = m3'
-    , csM4  = m4'
+    { csM1  = A1.step (csM1 s) evt
+    , csM2  = A2.step (csM2 s) te
+    , csM3  = A3.step (csM3 s) te
     , csObs = obs'
     }
 
+-- | Veredito de stream (ínfimo dos componentes), domínio {⊥, ?}.
 verdict :: ComposedState -> Verdict
 verdict s = minimum
-  [ A1.verdict (csM1 s), A2.verdict (csM2 s)
-  , A3.verdict (csM3 s), A4.verdict (csM4 s)
-  ]
+  [ A1.verdict (csM1 s), A2.verdict (csM2 s), A3.verdict (csM3 s) ]
 
+-- | Veredito terminal (ínfimo dos componentes), domínio {⊥, ⊤}.
 finalVerdict :: ComposedState -> Verdict
 finalVerdict s = minimum
-  [ A1.finalVerdict (csM1 s), A2.finalVerdict (csM2 s)
-  , A3.finalVerdict (csM3 s), A4.finalVerdict (csM4 s)
-  ]
+  [ A1.finalVerdict (csM1 s), A2.finalVerdict (csM2 s), A3.finalVerdict (csM3 s) ]
 
 violatingRules :: ComposedState -> [String]
 violatingRules s =
   [ n | (v, n) <-
       [ (A1.verdict (csM1 s), "A1"), (A2.verdict (csM2 s), "A2")
-      , (A3.verdict (csM3 s), "A3"), (A4.verdict (csM4 s), "A4")
-      ], v == Bot
+      , (A3.verdict (csM3 s), "A3") ], v == Bot
   ]
 
 finalViolatingRules :: ComposedState -> [String]
 finalViolatingRules s =
   [ n | (v, n) <-
       [ (A1.finalVerdict (csM1 s), "A1"), (A2.finalVerdict (csM2 s), "A2")
-      , (A3.finalVerdict (csM3 s), "A3"), (A4.finalVerdict (csM4 s), "A4")
-      ], v == Bot
+      , (A3.finalVerdict (csM3 s), "A3") ], v == Bot
   ]
+
+-- | Sumidouro de M₁ (violação de safety A1, capturada como fora_ciclo).
+sinkM1 :: ComposedState -> Bool
+sinkM1 = A1.isViolation . csM1
+
+-- | Sumidouro de M₂ (A2 violada → erro_classificacao via timeout_cls_i).
+sinkM2 :: ComposedState -> Bool
+sinkM2 = A2.isViolation . csM2
+
+-- | Sumidouro de M₃ (A3 violada → erro_decisao via leave_ab_silent_i).
+sinkM3 :: ComposedState -> Bool
+sinkM3 = A3.isViolation . csM3
 
 summary :: ComposedState -> String
 summary s = unwords
   [ "M1:" ++ A1.summary (csM1 s)
   , "M2:" ++ A2.summary (csM2 s)
   , "M3:" ++ A3.summary (csM3 s)
-  , "M4:" ++ A4.summary (csM4 s)
   ]
-
-data Step = Step
-  { stepIdx     :: !Int
-  , stepTime    :: !Int
-  , stepEvent   :: !Event
-  , stepState   :: !ComposedState
-  , stepVerdict :: !Verdict
-  , stepRules   :: ![String]
-  } deriving (Eq, Show)
-
-runMonitor :: Config -> [TimedEvent] -> (Verdict, Maybe (Int, Event), [String])
-runMonitor cfg = go 1 (initial cfg)
-  where
-    go _ s [] = case finalVerdict s of
-      Bot -> (Bot, Nothing, finalViolatingRules s)
-      v   -> (v, Nothing, [])
-    go i s (te : tes) =
-      let e  = teEvent te
-          s' = step s te
-      in if verdict s' == Bot && verdict s /= Bot
-           then (Bot, Just (i, e), violatingRules s')
-           else go (i + 1) s' tes
-
-runMonitorTrace
-  :: Config
-  -> [TimedEvent]
-  -> ([Step], Verdict, Maybe Int, [String])
-runMonitorTrace cfg tes =
-  let (steps, sFinal) = scanTrace cfg tes
-      mFirst = firstViolationIdx steps
-      fv     = finalVerdict sFinal
-      rules  = if fv == Bot then finalViolatingRules sFinal else []
-  in (steps, fv, mFirst, rules)
-
-scanTrace :: Config -> [TimedEvent] -> ([Step], ComposedState)
-scanTrace cfg = go 1 (initial cfg)
-  where
-    go _ s [] = ([], s)
-    go i s (te : tes) =
-      let s'   = step s te
-          stp  = Step i (teTime te) (teEvent te) s' (verdict s') (violatingRules s')
-          (rest, sFinal) = go (i + 1) s' tes
-      in (stp : rest, sFinal)
-
-firstViolationIdx :: [Step] -> Maybe Int
-firstViolationIdx = go Top
-  where
-    go _ [] = Nothing
-    go prev (st : rest)
-      | stepVerdict st == Bot && prev /= Bot = Just (stepIdx st)
-      | otherwise = go (stepVerdict st) rest

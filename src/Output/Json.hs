@@ -1,10 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Formato de saída JSON estruturado (@--json@).
+-- | Formato de saída JSON estruturado (@--json@) — log auditável.
 --
--- Implementação ad-hoc — sem 'aeson' — porque o esquema é fixo e
--- pequeno. Se a Fase 11/Fase 12 precisar de schema validation ou
--- streaming, trocar por 'aeson' afeta só este módulo.
+-- Implementação ad-hoc — sem 'aeson' — porque o esquema é fixo e pequeno.
 --
 -- Esquema (top-level):
 --
@@ -12,28 +10,40 @@
 -- {
 --   "file": "Files/Traces/trace_08_...",
 --   "header": { ... | null },
---   "config": { "t_cls": 30000, "t_dec": 31000, "t_pcp": 300000, "tau": 0.85 },
---   "steps":  [ { "i": 1, "t": 0, "event": "ab_i", "verdict": "TOP", ... }, ... ],
---   "verdict": "BOT",
+--   "config": { "t_cls": 1500, "t_dec": 1700, "delta_mb": 100, "tau": 0.85 },
+--   "steps":  [ { "i": 1, "t_ms": 0, "event": "ab_i", "verdict": "INCONCLUSIVE", ... }, ... ],
+--   "verdict": "TOP",                      // veredito composto (Proposição 2)
+--   "gate": {
+--     "decision": "BLOQUEAR",
+--     "status":   "divergencia_pcp",       // §5.4, Tabela 4
+--     "diag":     "mismatch" | null,
+--     "escala":   "PCP (Planejamento e Controle da Produção)"
+--   },
 --   "first_violation_idx": 4 | null,
+--   "div_materialized_idx": 9 | null,
 --   "violating_rules": ["A1", "A3"]
 -- }
 -- @
 --
--- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "ERP".
--- Referência: §5.2 (log auditável).
+-- | Bloco arquitetural na figura de arquitetura do artigo: "ERP".
+-- Referência: §5.4 (log auditável do gate).
 module Output.Json
   ( renderJson
   ) where
 
 import qualified Data.Map.Strict      as Map
 import qualified Data.Text            as T
-import           Monitor.Composed     (ComposedState (..), Step (..), summary)
+import           Monitor.Composed     (ComposedState (..), summary)
+import           Monitor.Gate         (GateResult (..), Step (..))
 import           Monitor.Header       (TraceHeader (..))
 import           Monitor.Multiset     (Multiset)
 import           Monitor.Types        ( Config (..)
                                       , Event (..)
+                                      , MesStatus (..)
                                       , Verdict (..)
+                                      , showDiag
+                                      , showStatus
+                                      , statusEscala
                                       )
 
 data JValue
@@ -48,21 +58,33 @@ renderJson
   :: FilePath
   -> Maybe TraceHeader
   -> Config
-  -> [Step]
-  -> Verdict
-  -> Maybe Int
-  -> [String]
+  -> GateResult
   -> String
-renderJson fp mHdr cfg steps v mFirst rules =
+renderJson fp mHdr cfg res =
   renderJValue 0 $ JObj
     [ ("file"               , JStr fp)
     , ("header"             , maybe JNull headerToJValue mHdr)
     , ("config"             , configToJValue cfg)
-    , ("steps"              , JArr (map stepToJValue steps))
-    , ("verdict"            , JStr (verdictTag v))
-    , ("first_violation_idx", maybe JNull JInt mFirst)
-    , ("violating_rules"    , JArr (map JStr rules))
+    , ("steps"              , JArr (map stepToJValue (grSteps res)))
+    , ("verdict"            , JStr (verdictTag (grVerdict res)))
+    , ("gate"               , gateToJValue res)
+    , ("first_violation_idx", maybe JNull JInt (grFirstViol res))
+    , ("div_materialized_idx", maybe JNull JInt (grDivAt res))
+    , ("violating_rules"    , JArr (map JStr (grRules res)))
     ]
+
+gateToJValue :: GateResult -> JValue
+gateToJValue res = JObj
+  [ ("decision", JStr (decisionWord (grStatus res)))
+  , ("status"  , JStr (showStatus (grStatus res)))
+  , ("diag"    , maybe JNull (JStr . showDiag) (grDiag res))
+  , ("escala"  , JStr (statusEscala (grStatus res)))
+  ]
+
+decisionWord :: MesStatus -> String
+decisionWord LiberadoIntegracao  = "LIBERAR"
+decisionWord PendenteVerificacao = "PENDENTE"
+decisionWord _                   = "BLOQUEAR"
 
 headerToJValue :: TraceHeader -> JValue
 headerToJValue h = JObj
@@ -75,21 +97,21 @@ headerToJValue h = JObj
 
 configToJValue :: Config -> JValue
 configToJValue cfg = JObj
-  [ ("t_cls", JInt (cfgTcls cfg))
-  , ("t_dec", JInt (cfgTdec cfg))
-  , ("t_pcp", JInt (cfgTpcp cfg))
-  , ("tau"  , JDbl (cfgTau cfg))
+  [ ("t_cls"   , JInt (cfgTcls cfg))
+  , ("t_dec"   , JInt (cfgTdec cfg))
+  , ("delta_mb", JInt (cfgDeltaMb cfg))
+  , ("tau"     , JDbl (cfgTau cfg))
   ]
 
 stepToJValue :: Step -> JValue
 stepToJValue st = JObj
-  [ ("i"           , JInt (stepIdx st))
-  , ("t_ms"        , JInt (stepTime st))
-  , ("event"       , JStr (eventTag (stepEvent st)))
-  , ("event_repr"  , JStr (eventRepr (stepEvent st)))
-  , ("verdict"     , JStr (verdictTag (stepVerdict st)))
+  [ ("i"            , JInt (stepIdx st))
+  , ("t_ms"         , JInt (stepTime st))
+  , ("event"        , JStr (eventTag (stepEvent st)))
+  , ("event_repr"   , JStr (eventRepr (stepEvent st)))
+  , ("verdict"      , JStr (verdictTag (stepVerdict st)))
   , ("state_summary", JStr (summary (stepState st)))
-  , ("m_obs"       , multisetToJValue (csObs (stepState st)))
+  , ("m_obs"        , multisetToJValue (csObs (stepState st)))
   , ("violating_rules", JArr (map JStr (stepRules st)))
   ]
 

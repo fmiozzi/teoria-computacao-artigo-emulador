@@ -1,9 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Para cada @Files/Traces/*.txt@ e @Files/Smoke/*.txt@, executa o
--- monitor e verifica que o veredito final bate com @veredito_esperado@
--- do cabeçalho YAML. Traços sem @veredito_esperado@ são pulados (e
--- contabilizados em uma label informativa).
+-- | Para cada @Files/Traces/**/*.txt@ e @Files/Smoke/*.txt@, executa o
+-- monitor (via 'Monitor.Gate.run') e verifica que:
+--
+--   * o veredito composto (Proposição 2) bate com @veredito_esperado@; e
+--   * o status terminal do gate (§5.4) bate com @status_esperado@, quando
+--     declarado.
+--
+-- Traços sem o campo correspondente pulam a verificação daquele campo
+-- (apenas o parsing é exigido).
 module ExampleTraces (tests) where
 
 import qualified Data.Text.IO       as TIO
@@ -12,16 +17,19 @@ import           System.FilePath    ((</>), takeExtension)
 import           Test.Tasty         (TestTree, testGroup)
 import           Test.Tasty.HUnit   (testCase, assertEqual, assertFailure)
 
-import           Monitor.Composed   (runMonitor)
+import           Monitor.Gate       (GateResult (..), run)
 import           Monitor.Header     (TraceHeader (..), applyParams)
-import           Monitor.MesBridge  (injectMesBridge)
 import           Monitor.Parser     (parseFile)
-import           Monitor.Types      (defaultConfig)
+import           Monitor.Types      (defaultConfig, showStatus, showVerdict)
 
+-- | Oráculo canônico: traços do recorte verificado (A1–A3 + A5) no nível
+-- superior de @Files/Traces@ e os smokes. Os traços prospectivos em
+-- @Files/Traces/extras@ (A4/A6/A7/A8) ficam fora do recorte avaliado e
+-- não são exercitados aqui.
 tests :: IO TestTree
 tests = do
-  txt   <- listTxt "Files/Traces"
-  smoke <- listTxt "Files/Smoke"
+  txt    <- listTxt "Files/Traces"
+  smoke  <- listTxt "Files/Smoke"
   let all_ = txt ++ smoke
   pure $ testGroup "ExampleTraces" (map mkTest all_)
 
@@ -38,10 +46,21 @@ mkTest fp = testCase fp $ do
   case parseFile content of
     Left err -> assertFailure ("erro de parsing: " ++ err)
     Right (hdr, events) -> do
-      let cfg     = applyParams hdr defaultConfig
-          events' = injectMesBridge cfg hdr events
-          (v, _, _) = runMonitor cfg events'
+      let cfg = applyParams hdr defaultConfig
+          res = run cfg (hdr >>= thMdec) events
+      -- (1) veredito composto vs veredito_esperado
       case hdr >>= thExpected of
-        Nothing       -> pure ()  -- sem veredito_esperado: só checamos parsing
+        Nothing -> pure ()
         Just expected ->
-          assertEqual ("veredito divergente em " ++ fp) expected v
+          assertEqual
+            ("veredito composto divergente em " ++ fp ++
+             " (obtido " ++ showVerdict (grVerdict res) ++ ")")
+            expected (grVerdict res)
+      -- (2) status do gate vs status_esperado (quando declarado)
+      case hdr >>= thStatus of
+        Nothing -> pure ()
+        Just expectedSt ->
+          assertEqual
+            ("status do gate divergente em " ++ fp ++
+             " (obtido " ++ showStatus (grStatus res) ++ ")")
+            expectedSt (grStatus res)

@@ -5,14 +5,14 @@
 -- Modos de saída:
 --
 -- * default — formato detalhado tipo "emulador" ("Output.Detailed");
--- * @--quiet@ — formato curto compatível com a Peça 1 ("Output.Plain");
--- * @--json@  — JSON estruturado ("Output.Json").
+-- * @--quiet@ — formato curto, 1 bloco por traço ("Output.Plain");
+-- * @--json@  — JSON estruturado, log auditável ("Output.Json").
 --
--- Códigos de saída (LTL₃):
+-- Códigos de saída (derivados do status do gate, §5.4):
 --
--- * 0 — ⊤ traço aceito;
--- * 2 — ⊥ traço violado;
--- * 3 — ? inconclusivo (prefixo sem decisão);
+-- * 0 — LIBERAR (liberado_integracao);
+-- * 2 — BLOQUEAR (divergencia_pcp | erro_classificacao | erro_decisao);
+-- * 3 — PENDENTE (apontamento sem decisão terminal);
 -- * 1 — erro de parsing/IO/uso.
 module Main (main) where
 
@@ -21,11 +21,10 @@ import           System.Environment (getArgs)
 import           System.Exit        (ExitCode (..), exitWith)
 import           System.IO          (hPutStrLn, stderr)
 
-import           Monitor.Composed   (runMonitor, runMonitorTrace)
-import           Monitor.Header     (applyParams)
-import           Monitor.MesBridge  (injectMesBridge)
+import           Monitor.Gate       (GateResult (..), run)
+import           Monitor.Header     (TraceHeader (..), applyParams)
 import           Monitor.Parser     (parseFile)
-import           Monitor.Types      (Verdict (..), defaultConfig)
+import           Monitor.Types      (MesStatus (..), defaultConfig)
 import qualified Output.Detailed    as Det
 import qualified Output.Json        as Js
 import qualified Output.Plain       as Plain
@@ -62,7 +61,7 @@ usage msg = do
   hPutStrLn stderr "Modos:"
   hPutStrLn stderr "  (padrão)  formato detalhado tipo \"emulador\""
   hPutStrLn stderr "  --quiet   formato curto (1 bloco por traço — uso em batch)"
-  hPutStrLn stderr "  --json    JSON estruturado"
+  hPutStrLn stderr "  --json    JSON estruturado (log auditável)"
   exitWith (ExitFailure 1)
 
 processFile :: Mode -> FilePath -> IO ()
@@ -73,23 +72,16 @@ processFile mode filepath = do
       hPutStrLn stderr ("Erro ao parsear traço: " ++ err)
       exitWith (ExitFailure 1)
     Right (hdr, events) -> do
-      let cfg     = applyParams hdr defaultConfig
-          events' = injectMesBridge cfg hdr events
+      let cfg = applyParams hdr defaultConfig
+          res = run cfg (hdr >>= thMdec) events
       case mode of
-        ModeQuiet -> do
-          let (v, viol, rules) = runMonitor cfg events'
-          putStr (Plain.renderReport filepath (length events') v viol rules)
-          exitOn v
-        ModeDetailed -> do
-          let (steps, v, mFirst, rules) = runMonitorTrace cfg events'
-          putStr (Det.renderDetailed filepath hdr cfg steps v mFirst rules)
-          exitOn v
-        ModeJson -> do
-          let (steps, v, mFirst, rules) = runMonitorTrace cfg events'
-          putStrLn (Js.renderJson filepath hdr cfg steps v mFirst rules)
-          exitOn v
+        ModeQuiet    -> putStr   (Plain.renderReport filepath res)
+        ModeDetailed -> putStr   (Det.renderDetailed filepath hdr cfg res)
+        ModeJson     -> putStrLn (Js.renderJson filepath hdr cfg res)
+      exitOn (grStatus res)
 
-exitOn :: Verdict -> IO ()
-exitOn Top          = exitWith ExitSuccess
-exitOn Bot          = exitWith (ExitFailure 2)
-exitOn Inconclusive = exitWith (ExitFailure 3)
+-- | Código de saída derivado do status terminal do gate (§5.4).
+exitOn :: MesStatus -> IO ()
+exitOn LiberadoIntegracao  = exitWith ExitSuccess
+exitOn PendenteVerificacao = exitWith (ExitFailure 3)
+exitOn _                   = exitWith (ExitFailure 2)

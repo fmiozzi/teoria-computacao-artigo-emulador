@@ -5,6 +5,7 @@ maquina: ROTO-01
 braco: 1
 parametros: {Tcls: 2000, Tdec: 4000, Tpcp: 5000, tau: 0.85}
 veredito_esperado: BOT
+status_esperado: erro_classificacao
 propriedades_relevantes: [A1, A2, A3]
 referencia_artigo: "Tabela 2 (A2); fig-automato-a2-tltl"
 ---
@@ -23,4 +24,4 @@ referencia_artigo: "Tabela 2 (A2); fig-automato-a2-tltl"
 [t=  500] rem_i
 [t= 1000] leave_ab_i
 [t= 2000] match_i
-[t= 5000] cls_p_i caixa_2000L 0.92
+[t= 5000] cls_p_i caixa_500L 0.92

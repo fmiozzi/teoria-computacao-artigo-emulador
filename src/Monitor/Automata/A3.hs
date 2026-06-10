@@ -17,8 +17,10 @@
 -- * 'M3Ok' — q_0, ocioso/aceitante;
 -- * 'M3Pending clock' — q_p, leave_ab_i ocorreu em @clock@ ms (relógio
 --   x := 0), aguardando match/div sob a guarda x ≤ T_dec;
--- * 'M3Violated' — q_⊥, sumidouro absorvente (promove leave_ab_silent_i,
---   consumido por M4).
+-- * 'M3Violated' — q_⊥, sumidouro absorvente. Sua expiração promove o
+--   evento sintético leave_ab_silent_i, consumido pelo /efetor/ (gate)
+--   para transitar o apontamento a @erro_decisao@ (escala à TI). Não é
+--   div_i (§3.4).
 --
 -- /Política para fim de traço/: se o último estado é 'M3Pending', o
 -- 'finalVerdict' retorna ⊥ — janela encerrada sem pronunciamento dentro
@@ -30,6 +32,7 @@ module Monitor.Automata.A3
   , step
   , verdict
   , finalVerdict
+  , isViolation
   , summary
   ) where
 
@@ -68,20 +71,26 @@ step m (TimedEvent now evt) = case m3State m of
         DivI   -> m { m3State = M3Ok }
         _      -> m
 
--- | Veredito durante o stream. 'M3Pending' não viola ainda — match/div
--- pode chegar dentro do prazo.
+-- | Veredito de /stream/ (LTL₃). A3' é bounded liveness realizada como
+-- safety (§5.3): sobre prefixo finito o ⊤ não é alcançável, logo o domínio
+-- é {⊥, ?}. Em 'M3Ok' ou 'M3Pending' o veredito é ? ("match/div ainda pode
+-- chegar dentro de T_dec"); ao expirar o relógio, ⊥.
 verdict :: M3 -> Verdict
 verdict m = case m3State m of
   M3Violated -> Bot
-  _          -> Top
+  _          -> Inconclusive
 
--- | Veredito ao fim do traço. 'M3Pending' agora viola (leave_ab_i sem
--- pronunciamento dentro do horizonte observado).
+-- | Veredito /terminal/. 'M3Pending' ao fim do traço viola (leave_ab_i sem
+-- pronunciamento no horizonte observado) → ⊥; 'M3Ok' → ⊤.
 finalVerdict :: M3 -> Verdict
 finalVerdict m = case m3State m of
   M3Violated  -> Bot
   M3Pending _ -> Bot
   M3Ok        -> Top
+
+-- | 'True' sse M₃ está no sumidouro de violação (promove leave_ab_silent_i).
+isViolation :: M3 -> Bool
+isViolation m = m3State m == M3Violated
 
 summary :: M3 -> String
 summary m = case m3State m of

@@ -1,6 +1,7 @@
 ---
 cenario: "Violação A1 — rem_i ocorre após leave_ab_i"
 veredito_esperado: BOT
+status_esperado: divergencia_pcp
 ---
 # Operador tenta retirar peça depois do fim da janela. Esperado:
 # VIOLA na posição #4 — A1 e A3 disparam simultaneamente (rem_i é

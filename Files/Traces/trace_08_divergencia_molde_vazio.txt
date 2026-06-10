@@ -2,8 +2,9 @@
 cenario: "Molde vazio esquecido no MES (Situação 2 do artigo)"
 maquina: ROTO-01
 braco: 1
-m_dec: {caixa_1000L: 2, caixa_2000L: 2}
-veredito_esperado: BOT
+m_dec: {caixa_1000L: 2, caixa_500L: 2}
+veredito_esperado: TOP
+status_esperado: divergencia_pcp
 ---
 # Realidade física: 2× 1000L + 1× 2000L + 1 molde vazio (idêntico ao
 # cenário 6). MAS o PCP esqueceu de declarar a posição vazia no MES.
@@ -26,6 +27,6 @@ veredito_esperado: BOT
 [t= 3500] rem_i
 [t= 4000] cls_p_i caixa_1000L 0.95
 [t= 5500] rem_i
-[t= 6000] cls_p_i caixa_2000L 0.88
+[t= 6000] cls_p_i caixa_500L 0.88
 [t= 8000] leave_ab_i
 # silêncio: agente não emite match_i nem div_i (falha de implementação)
