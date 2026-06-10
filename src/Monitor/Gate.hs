@@ -59,6 +59,7 @@ import           Monitor.Types          ( Config (..)
                                         , MesStatus (..)
                                         , TimedEvent (..)
                                         , Verdict (..)
+                                        , isAP
                                         )
 
 -- ---------------------------------------------------------------------------
@@ -106,8 +107,12 @@ data GateResult = GateResult
 -- estruturais; (ii) o produto @M₁ ⊗ M₂ ⊗ M₃@ é atualizado por @δ@; (iii) o
 -- efetor roteia o status conforme o componente que detecta a falha.
 run :: Config -> Maybe Multiset -> [TimedEvent] -> GateResult
-run cfg mDec events =
-  let enriched   = enrich cfg mDec events
+run cfg mDec events0 =
+  let -- O monitor verificado consome apenas o alfabeto AP do artigo (§3.2):
+      -- proposições prospectivas (esc_pcp/heartbeat/rej) são descartadas
+      -- antes do produto, garantindo que não avancem relógios de M₂/M₃.
+      events     = filter (isAP . teEvent) events0
+      enriched   = enrich cfg mDec events
       steps      = scan cfg (map fst enriched)
       finalState = if null steps then C.initial cfg else stepState (last steps)
       -- div materializado: primeiro evento div_i no fluxo enriquecido (e seu diag)
@@ -206,7 +211,13 @@ enrich cfg mDec = go initEnrich
   where
     tau  = cfgTau cfg
     tcls = cfgTcls cfg
-    dmb  = cfgDeltaMb cfg
+    -- δ_mb efetivo: impõe a invariante normativa δ_mb ≤ T_dec − T_cls
+    -- (§3.4) de forma defensiva, mesmo quando o cabeçalho do traço
+    -- sobrescreve T_cls/T_dec. Assim o pronunciamento de coerência cai
+    -- sempre em τ_b + T_cls + δ_mb ≤ τ_b + T_dec (dentro do horizonte de
+    -- A3) quando T_dec ≥ T_cls; se T_dec < T_cls (configuração que viola a
+    -- premissa), δ_mb = 0 e a expiração de M₃ captura o atraso.
+    dmb  = max 0 (min (cfgDeltaMb cfg) (cfgTdec cfg - tcls))
 
     -- instante do pronunciamento de coerência da janela com fecho em tb
     emitAt tb = tb + tcls + dmb

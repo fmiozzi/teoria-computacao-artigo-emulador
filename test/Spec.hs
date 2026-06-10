@@ -6,6 +6,7 @@ import qualified ExampleTraces
 import qualified CompositionProps
 import qualified AbsorbingProps
 import qualified UnitProps
+import qualified GateProps
 
 main :: IO ()
 main = do
@@ -13,6 +14,7 @@ main = do
   defaultMain $ testGroup "lab-monitor"
     [ egTests
     , UnitProps.tests
+    , GateProps.tests
     , CompositionProps.tests
     , AbsorbingProps.tests
     ]

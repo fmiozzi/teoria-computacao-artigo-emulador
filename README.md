@@ -224,7 +224,10 @@ curados (recorte A1–A3 + A5), mais 4 traços prospectivos em `extras/` (§6), 
 ainda o corpus de 400 traços aleatórios descrito abaixo. Análise detalhada em
 [docs/CENARIOS.md](docs/CENARIOS.md); decisões de projeto em
 [docs/DECISOES.md](docs/DECISOES.md); formato de traço em
-[docs/FORMATO_TRACE.md](docs/FORMATO_TRACE.md).
+[docs/FORMATO_TRACE.md](docs/FORMATO_TRACE.md); arquitetura em
+[docs/ARQUITETURA.md](docs/ARQUITETURA.md); referências em
+[docs/REFERENCIAS.md](docs/REFERENCIAS.md). Para depurar via GHCi, ver
+[debug.md](debug.md).
 
 ## Corpus aleatório (Proposição 2 — PBT materializado)
 
@@ -255,11 +258,15 @@ re-executável pelo CLI (`lab-monitor Files/Corpus/traces/corpus_001.txt`).
   school  = {Programa de P{\'o}s-Gradua{\c c}{\~a}o em Computa{\c c}{\~a}o
              Aplicada (PPComp), Instituto Federal do Esp{\'i}rito Santo (Ifes)},
   year    = {2026},
-  note    = {Venue a definir}
+  doi     = {TODO: preencher com o DOI assim que emitido},
+  url     = {TODO: URL do registro com DOI}
 }
 ```
 
+> O artefato de software (este emulador) recebe um DOI próprio no
+> depósito (Zenodo/figshare); atualize os campos `doi`/`url` acima quando
+> emitido.
+
 ## Licença
 
-Consulte o arquivo [LICENSE](LICENSE). A licença definitiva está a definir
-conforme o conteúdo de `LICENSE`.
+Licenciado sob a **Licença MIT** — ver [LICENSE](LICENSE).

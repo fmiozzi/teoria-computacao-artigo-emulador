@@ -57,3 +57,5 @@ jobs:
       - name: Corpus aleatório (gerador reproduzível + Proposição 2)
         run: |
           nix develop --command cabal run -v0 corpus-gen
+          # Reprodutibilidade: o corpus versionado deve ser idêntico ao gerado.
+          git diff --exit-code Files/Corpus

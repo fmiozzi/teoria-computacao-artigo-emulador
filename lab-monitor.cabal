@@ -74,6 +74,7 @@ test-suite lab-monitor-test
       , CompositionProps
       , AbsorbingProps
       , UnitProps
+      , GateProps
     build-depends:
         base,
         text,

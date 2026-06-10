@@ -16,7 +16,7 @@ no branch `main`.
 
 Reescrita do recorte verificado e do efetor para o modelo **normativo
 v2_3** (`Artigo_SBC_Teo_Comp_v2_3.pdf`). Esta entrada consolida as
-correções F1–F10; o código compila e testa (GHC 9.4.8 via Nix), **31
+correções F1–F10; o código compila e testa (GHC 9.4.8 via Nix), **43
 testes** verdes.
 
 - **F1 — Composição (`Monitor.Composed`).** O monitor verificado passa a
@@ -84,6 +84,20 @@ testes** verdes.
   `RELATORIO.md`. Materializa o PBT da Proposição 2 (confirmada 400/400).
   Distribuição: 208 ⊤ / 192 ⊥; gate 138 `liberado_integracao` / 70
   `divergencia_pcp` / 155 `erro_classificacao` / 37 `erro_decisao`.
+- **Testes do efetor (`test/GateProps.hs`).** Nova bateria HUnit que
+  exercita os quatro status terminais e os cinco diagnósticos do gate —
+  incluindo `fora_ciclo` (detector de exceções estruturais do mes-bridge)
+  — e a precedência da decisão (`Gate.decide`). Suíte passa a **43 testes**.
+- **Invariante temporal (`Monitor.Gate`).** O δ_mb efetivo é limitado a
+  `δ_mb ≤ T_dec − T_cls` (§3.4) em runtime, de forma defensiva, mesmo
+  quando o cabeçalho sobrescreve `T_cls`/`T_dec`.
+- **Filtro de AP (`Monitor.Gate.run`).** As proposições prospectivas
+  (`esc_pcp`/`heartbeat`/`rej`) são descartadas via `isAP` antes do
+  produto, garantindo que não avancem relógios do monitor verificado.
+- **Higiene do artefato (DOI).** Removidos `Hello_World/` (tutorial não
+  relacionado, versionado com binário) e `Exec_Git/` (scripts de
+  sincronização pessoal); o CI passa a verificar que o corpus versionado
+  não diverge do gerador (`git diff --exit-code Files/Corpus`).
 
 ## [0.7.0] — 2026-05-23 (Fase 10) ⚠ obsoleto desde 0.8.0
 
@@ -224,5 +238,6 @@ Quebra do `Main.hs` monolítico em módulos coesos.
 ## [0.1.0] — 2026-05-22 (Peça 1)
 
 Versão inicial — A1 (`G(rem_i → ab_i)`) implementada em `Main.hs`
-monolítico. 5 traços de exemplo. Build com Nix/Cabal. Configuração do
-GitHub remoto via `Exec_Git/init.git.sh`/`sync.git.sh`.
+monolítico. 5 traços de exemplo. Build com Nix/Cabal. (Os scripts de
+sincronização com o GitHub usados nesta fase foram removidos do artefato
+na 0.8.0.)

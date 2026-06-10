@@ -21,7 +21,8 @@
 -- composer decremente 'csObs' (a peça refugada não conta como produto
 -- válido).
 --
--- Extensão futura (artigo §6) — FORA do monitor composto da v2 (M1⊗M2⊗M3⊗M4).
+-- Extensão prospectiva (artigo §6) — FORA do monitor composto verificado
+-- M = M₁ ⊗ M₂ ⊗ M₃ (A1–A3); não importada por "Monitor.Composed".
 module Monitor.Automata.A7
   ( M7State (..)
   , M7

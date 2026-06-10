@@ -8,10 +8,11 @@
 --
 -- "A janela de abastecimento deve fechar em até T_ab_max ms."
 --
--- Estrutura idêntica a A2/A4 — só muda o par de eventos (ab/leave) e
--- o parâmetro (T_ab_max em vez de T_cls/T_pcp).
+-- Estrutura idêntica a A2 — só muda o par de eventos (ab/leave) e
+-- o parâmetro (T_ab_max em vez de T_cls).
 --
--- Extensão futura (artigo §6) — FORA do monitor composto da v2 (M1⊗M2⊗M3⊗M4).
+-- Extensão prospectiva (artigo §6) — FORA do monitor composto verificado
+-- M = M₁ ⊗ M₂ ⊗ M₃ (A1–A3); não importada por "Monitor.Composed".
 module Monitor.Automata.A8
   ( M8State (..)
   , M8
