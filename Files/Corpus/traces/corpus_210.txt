@@ -1,0 +1,14 @@
+---
+cenario: "Corpus aleatório — caso 210 (semente 25214903917)"
+m_dec: {}
+veredito_esperado: BOT
+status_esperado: erro_classificacao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=   425] rem_i
+[t=   751] cls_p_i molde_caixa_500L_vazio 0.639155
+[t=  1570] rem_i
+[t=  3037] leave_ab_i
+[t=  3037] match_i

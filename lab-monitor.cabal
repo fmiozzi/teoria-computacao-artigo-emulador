@@ -48,6 +48,22 @@ executable lab-monitor
         text,
         lab-monitor
 
+-- | Gerador do corpus aleatório de 400 traços (PBT materializado, §5/§7 do
+-- artigo). Reproduzível por semente fixa; emite os traços + resultados em
+-- Files/Corpus/ e verifica a Proposição 2 (veredito composto = ínfimo) em
+-- cada caso. Uso: `cabal run corpus-gen`.
+executable corpus-gen
+    import:           warnings
+    main-is:          Corpus.hs
+    hs-source-dirs:   app
+    build-depends:
+        base,
+        text,
+        containers,
+        directory,
+        filepath,
+        lab-monitor
+
 test-suite lab-monitor-test
     import:           warnings
     type:             exitcode-stdio-1.0

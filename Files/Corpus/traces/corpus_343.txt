@@ -1,0 +1,15 @@
+---
+cenario: "Corpus aleatório — caso 343 (semente 25214903917)"
+veredito_esperado: BOT
+status_esperado: erro_decisao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=  1852] rem_i
+[t=  2412] cls_p_i caixa_500L 0.9819264999999999
+[t=  4397] rem_i
+[t=  5751] rem_i
+[t=  7705] rem_i
+[t=  8005] cls_p_i molde_tampa_1000L_abastecido 0.6888535
+[t=  8602] leave_ab_i

@@ -1,0 +1,14 @@
+---
+cenario: "Corpus aleatório — caso 169 (semente 25214903917)"
+veredito_esperado: BOT
+status_esperado: erro_classificacao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=  1600] rem_i
+[t=  1890] cls_p_i molde_tampa_500L_vazio 0.5759395
+[t=  2622] rem_i
+[t=  3111] cls_p_i caixa_1000L 0.6491105
+[t=  4950] leave_ab_i
+[t=  4950] match_i

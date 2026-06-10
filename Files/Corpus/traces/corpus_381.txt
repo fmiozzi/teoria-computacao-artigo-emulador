@@ -1,0 +1,16 @@
+---
+cenario: "Corpus aleatório — caso 381 (semente 25214903917)"
+m_dec: {}
+veredito_esperado: BOT
+status_esperado: erro_classificacao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=  1733] rem_i
+[t=  2320] cls_p_i molde_tampa_1000L_abastecido 0.7641145
+[t=  3821] rem_i
+[t=  4128] cls_p_i molde_tampa_1000L_abastecido 0.8159730000000001
+[t=  5402] rem_i
+[t=  5974] leave_ab_i
+[t=  5974] match_i

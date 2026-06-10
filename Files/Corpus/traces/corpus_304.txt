@@ -1,0 +1,16 @@
+---
+cenario: "Corpus aleatório — caso 304 (semente 25214903917)"
+m_dec: {molde_tampa_1000L_abastecido: 1}
+veredito_esperado: BOT
+status_esperado: erro_classificacao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=   858] rem_i
+[t=  1135] cls_p_i molde_tampa_500L_vazio 0.5342285
+[t=  1495] rem_i
+[t=  2067] cls_p_i molde_caixa_1000L_vazio 0.7635055
+[t=  2293] rem_i
+[t=  2538] cls_p_i molde_tampa_500L_vazio 0.540322
+[t=  2871] leave_ab_i

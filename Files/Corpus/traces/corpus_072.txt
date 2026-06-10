@@ -1,0 +1,17 @@
+---
+cenario: "Corpus aleatório — caso 072 (semente 25214903917)"
+m_dec: {molde_tampa_500L_vazio: 1}
+veredito_esperado: TOP
+status_esperado: liberado_integracao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=  1787] rem_i
+[t=  2194] rem_i
+[t=  2784] cls_p_i molde_tampa_500L_vazio 0.8856165
+[t=  3279] rem_i
+[t=  3496] cls_p_i molde_caixa_500L_vazio 0.7200345
+[t=  4957] rem_i
+[t=  5125] cls_p_i caixa_1000L 0.7823705000000001
+[t=  6557] leave_ab_i

@@ -1,0 +1,17 @@
+---
+cenario: "Corpus aleatório — caso 363 (semente 25214903917)"
+m_dec: {molde_tampa_500L_vazio: 1}
+veredito_esperado: BOT
+status_esperado: erro_classificacao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=  1649] rem_i
+[t=  1916] cls_p_i molde_tampa_1000L_abastecido 0.7138285
+[t=  2792] rem_i
+[t=  3208] cls_p_i caixa_500L 0.8482689999999999
+[t=  4887] rem_i
+[t=  6885] rem_i
+[t=  9277] leave_ab_i
+[t=  9277] div_i
