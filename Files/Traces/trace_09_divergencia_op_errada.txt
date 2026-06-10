@@ -1,5 +1,5 @@
 ---
-cenario: "OP errada no PLC — braço 2 produziu 1000L em vez de 2000L (Situação 3)"
+cenario: "OP errada no PLC — braço 2 produziu 1000L em vez de 500L (Situação 3)"
 maquina: ROTO-01
 braco: 2
 m_dec: {caixa_500L: 4}
@@ -9,14 +9,16 @@ status_esperado: divergencia_pcp
 # Realidade física: o braço 2 produziu 4× caixa_1000L (porque os moldes
 # físicos eram para 1000L, ou setup térmico inadequado, ou troca de
 # moldes sem atualizar a OP). A OP C continua dizendo "4× caixa_500L".
-# M_obs = {1000L:4}, M_dec = {2000L:4} → divergência total.
+# M_obs = {1000L:4}, M_dec = {500L:4} → divergência total.
 #
-# O agente não se pronuncia ao fim da janela. O mes-bridge (Fase 6)
-# injeta div_i; A3 fica satisfeita; A4 passa a exigir esc_pcp_i em
-# T_pcp, que não chega → viola A4 ao fim do traço.
+# O agente não se pronuncia ao fim da janela. O mes-bridge compara
+# M_obs com M_dec e emite div_i por mismatch dentro de T_dec. Como a
+# decisão foi tomada no prazo, A1/A2/A3 ficam satisfeitas → VEREDITO
+# COMPOSTO ⊤.
 #
-# Histórico do veredito: Peça 1 aceitava; Fase 3 detectava A3; Fase 6
-# realoca a violação para A4.
+# Mas div_i é decisão de PROCESSO: o gate BLOQUEIA com divergencia_pcp
+# (diag mismatch) → tratativa manual no PCP. Mecanismo idêntico ao do
+# cenário 08, mudando só o SKU.
 
 [t=     0] ab_i
 [t=  2000] rem_i
@@ -28,4 +30,5 @@ status_esperado: divergencia_pcp
 [t=  9500] rem_i
 [t= 10000] cls_p_i caixa_1000L 0.93
 [t= 12000] leave_ab_i
-# silêncio: agente não se pronuncia (deveria emitir div_i)
+# silêncio: agente não se pronuncia; o mes-bridge emite div_i por
+# mismatch dentro de T_dec → gate bloqueia com divergencia_pcp.

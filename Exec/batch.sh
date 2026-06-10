@@ -23,8 +23,12 @@ fi
 echo "Processando ${#TRACES[@]} traço(s) em: $DIR"
 echo "=========================================="
 
-ACEITAS=0
-VIOLAS=0
+# Contagem por decisão do gate (§5.4), via código de saída do CLI:
+#   0 = LIBERAR (liberado_integracao); 2 = BLOQUEAR (divergencia_pcp |
+#   erro_classificacao | erro_decisao); 3 = pendente; demais = erro.
+LIBERADAS=0
+BLOQUEADAS=0
+PENDENTES=0
 ERROS=0
 
 for trace in "${TRACES[@]}"; do
@@ -34,16 +38,20 @@ for trace in "${TRACES[@]}"; do
   set -e
 
   case "$rc" in
-    0) ACEITAS=$((ACEITAS + 1)) ;;
-    2) VIOLAS=$((VIOLAS + 1)) ;;
+    0) LIBERADAS=$((LIBERADAS + 1)) ;;
+    2) BLOQUEADAS=$((BLOQUEADAS + 1)) ;;
+    3) PENDENTES=$((PENDENTES + 1)) ;;
     *) ERROS=$((ERROS + 1)) ;;
   esac
 done
 
 echo ""
 echo "=========================================="
-echo "Aceitas : $ACEITAS"
-echo "Violadas: $VIOLAS"
+echo "Liberadas (LIBERAR) : $LIBERADAS"
+echo "Bloqueadas (BLOQUEAR): $BLOQUEADAS"
+if [ "$PENDENTES" -gt 0 ]; then
+  echo "Pendentes           : $PENDENTES"
+fi
 if [ "$ERROS" -gt 0 ]; then
-  echo "Erros   : $ERROS"
+  echo "Erros               : $ERROS"
 fi

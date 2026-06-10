@@ -15,7 +15,8 @@ veredito_esperado: BOT
 #
 # A8: G(ab_i → F_[0, T_ab_max] leave_ab_i)
 #   "A janela de abastecimento deve fechar em até T_ab_max."
-#   Default T_ab_max = 900000 ms = 15 min.
+#   Default T_ab_max = 90000 ms (≈ 90 s, da ordem do ciclo da máquina;
+#   valor ilustrativo — o artigo não fixa T_ab_max).
 #
 # Aqui ab_i em t=0 e leave_ab_i em t=2040000 (34 min) → viola A8.
 

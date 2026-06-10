@@ -8,7 +8,8 @@ Bibliografia consultada na construção do emulador e do artigo associado.
 of the 18th Annual Symposium on Foundations of Computer Science (FOCS),
 46–57. IEEE.
 > Artigo seminal introduzindo LTL. Origem do operador G (*always*) usado
-> em A1, A3, A6, A7.
+> nas safety/liveness do recorte verificado (A1, A3) e nas extensões
+> prospectivas A6/A7 (§6).
 
 **Vardi, M. Y., & Wolper, P. (1986).** *An automata-theoretic approach
 to automatic program verification.* In Proceedings of the 1st Annual
@@ -31,7 +32,8 @@ Formal Methods in System Design, 48(1), 46–93.
 **Alur, R., & Dill, D. L. (1994).** *A theory of timed automata.*
 Theoretical Computer Science, 126(2), 183–235.
 > Fundamenta TLTL e autômatos temporizados. Inspira o tratamento dos
-> relógios em A2 (T_cls), A4 (T_pcp), A6 (T_h), A8 (T_ab_max).
+> relógios do recorte verificado — A2 (T_cls) e A3 (T_dec) — e os das
+> extensões prospectivas (§6): A4 (T_pcp), A6 (T_h), A8 (T_ab_max).
 
 **Bouyer, P., Markey, N., & Reynier, P.-A. (2008).** *Robust analysis
 of timed automata via channel machines.* In Foundations of Software

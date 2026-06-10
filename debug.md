@@ -24,20 +24,31 @@ Estrutura relevante do projeto:
 
 ```
 Emulador/
-├── app/Main.hs              ← entry point do executável
+├── app/Main.hs              ← entry point do executável (CLI)
+├── app/Corpus.hs            ← gerador do corpus aleatório (`cabal run corpus-gen`)
 ├── src/
 │   ├── Monitor/
-│   │   ├── Composed.hs      ← orquestra A1..A8, define `step` e `runMonitorTrace`
+│   │   ├── Gate.hs          ← MOTOR: `run`, Algoritmo 1; enriquece o fluxo e roteia o status
+│   │   ├── Composed.hs      ← produto puro M₁⊗M₂⊗M₃: `step`, `verdict`, `finalVerdict`, `sinkM*`
 │   │   ├── Parser.hs        ← parser de arquivos de traço
-│   │   ├── Types.hs         ← `Config`, `defaultConfig`, `Verdict`, `Event`
-│   │   ├── Header.hs        ← cabeçalho YAML do traço
-│   │   ├── MesBridge.hs     ← injeta eventos de bridge MES
+│   │   ├── Types.hs         ← `Config`, `defaultConfig`, `Verdict`, `Event`, `MesStatus`, `Diag`
+│   │   ├── Header.hs        ← cabeçalho YAML do traço (`veredito_esperado`, `status_esperado`)
+│   │   ├── MesBridge.hs     ← operações puras do mes-bridge: `pronounce`, `structuralException`
+│   │   ├── Classification.hs← filtro A5 (`isValidCls`)
 │   │   ├── Multiset.hs      ← M_obs (multiset de SKUs)
-│   │   └── Automata/        ← A1, A2, A3, A4, A6, A7, A8 (cada um seu `step`)
+│   │   └── Automata/        ← A1, A2, A3 (verificados) + A4, A6, A7, A8 (prospectivos §6, isolados)
 │   └── Output/              ← renderização (Plain, Detailed, Json)
-├── Files/Traces/            ← arquivos de traço para teste
+├── Files/Traces/            ← traços do recorte verificado (A1–A3 + A5)
+│   └── extras/              ← traços prospectivos (A4/A6/A7/A8, §6 — fora do recorte)
+├── Files/Corpus/            ← 400 traços aleatórios + resultados.csv + RELATORIO.md
 └── Exec/monitor.sh          ← wrapper que chama `cabal run lab-monitor`
 ```
+
+> **Atenção (mudança v2 → v2_3).** O motor é `Monitor.Gate.run`. As
+> funções antigas `Monitor.Composed.runMonitor` / `runMonitorTrace` e
+> `Monitor.MesBridge.injectMesBridge` **não existem mais**.
+> `Monitor.Composed` agora é só o produto declarativo dos TRÊS
+> componentes A1⊗A2⊗A3; A4 não faz parte do produto.
 
 ---
 
@@ -172,21 +183,26 @@ natural de "depurar".
 ### 5.1. Carregar módulos e ler um traço
 
 ```haskell
-:m + Main Monitor.Composed Monitor.Parser Monitor.Types Monitor.MesBridge
+:m + Main Monitor.Gate Monitor.Composed Monitor.Parser Monitor.Types Monitor.Header
 import qualified Data.Text.IO as TIO
 
 content <- TIO.readFile "Files/Traces/trace_01_aceita_simples.txt"
 let Right (hdr, events) = parseFile content
-let cfg     = defaultConfig
-let events' = injectMesBridge cfg hdr events
+let cfg  = applyParams hdr defaultConfig   -- aplica parametros: {...} do header, se houver
+let mDec = hdr >>= thMdec                  -- M_dec declarado (Maybe Multiset)
 ```
+
+`parseFile` devolve o cabeçalho (`Maybe TraceHeader`) e a lista de
+`TimedEvent` **crus** — o enriquecimento do fluxo (injeção de
+`match_i`/`div_i`) acontece **dentro** de `Gate.run`, não mais num
+pré-processador separado.
 
 Inspeciona o cabeçalho e a lista de eventos:
 
 ```haskell
 hdr
-length events'
-mapM_ print events'
+length events
+mapM_ print events
 ```
 
 ### 5.2. Estado inicial do monitor
@@ -202,46 +218,67 @@ seção 7.2 para o significado de cada campo.
 ### 5.3. Processar **um evento por vez**
 
 ```haskell
-let s1 = step s0 (events' !! 0)
+let s1 = step s0 (events !! 0)
 s1
 
-let s2 = step s1 (events' !! 1)
+let s2 = step s1 (events !! 1)
 s2
 
-let s3 = step s2 (events' !! 2)
+let s3 = step s2 (events !! 2)
 s3
 ```
 
 A cada `step`, compare com o estado anterior para ver **quais
-autômatos** mudaram. Isso é literalmente "1 passo do emulador".
+autômatos** (M₁/M₂/M₃) mudaram. Isso é literalmente "1 passo do produto
+sincronizado".
+
+> **Cuidado:** `step` aqui consome a lista de eventos **crua**. Se o
+> traço depende de um `match_i`/`div_i` injetado pelo mes-bridge (quando
+> há `M_dec` e o traço cala), esse evento sintético **não** está em
+> `events` — ele só aparece no fluxo enriquecido que `Gate.run` monta
+> internamente. Para inspecionar o fluxo já enriquecido, use os `grSteps`
+> da seção 5.4.
 
 ### 5.4. Pegar o resultado oficial e ver passo a passo
 
-```haskell
-let (steps, v, mFirst, rules) = runMonitorTrace cfg events'
+O motor é `Monitor.Gate.run :: Config -> Maybe Multiset -> [TimedEvent]
+-> GateResult`. Ele enriquece o fluxo (mes-bridge), roda o produto
+M₁⊗M₂⊗M₃ e roteia o status do gate (Algoritmo 1):
 
-length steps      -- quantos eventos processados
-v                 -- veredito final: Top, Bot ou Inconclusive
-mFirst            -- índice do primeiro evento que decidiu (se houve)
-rules             -- veredito por propriedade (A1..A8)
+```haskell
+let res = run cfg mDec events
+
+grStatus     res   -- status terminal do gate: LiberadoIntegracao | DivergenciaPcp | ErroClassificacao | ErroDecisao
+grDiag       res   -- Maybe Diag: causa-raiz do bloqueio (Nothing sse liberado)
+grVerdict    res   -- veredito composto terminal (Proposição 2): Top ou Bot
+grRules      res   -- componentes formais violados no terminal (ex.: ["A2"])
+grFirstViol  res   -- Maybe Int: índice 1-based da primeira violação de stream
+grDivAt      res   -- Maybe Int: índice do passo em que div_i se materializou
+length (grSteps res)  -- quantos eventos do fluxo ENRIQUECIDO foram processados
 ```
 
-Inspecionar um passo individual:
+> **Veredito ≠ status.** `grVerdict` é o veredito composto (ínfimo de
+> A1/A2/A3); `grStatus` é a decisão de processo do gate. Um `mismatch`
+> tem `grVerdict = Top` (a decisão foi tomada em prazo) mas
+> `grStatus = DivergenciaPcp`. São coisas distintas — não os confunda.
+
+Inspecionar um passo individual (os `Step` vêm de `Monitor.Gate`):
 
 ```haskell
+let steps = grSteps res
 steps !! 0        -- registro completo do passo 0
 stepEvent   (steps !! 0)
 stepTime    (steps !! 0)
 stepState   (steps !! 0)
-stepVerdict (steps !! 0)
+stepVerdict (steps !! 0)   -- veredito de stream neste passo (domínio {⊥, ?})
 stepRules   (steps !! 0)
 ```
 
-Veredito ao longo do tempo:
+Veredito de stream ao longo do tempo:
 
 ```haskell
 map stepVerdict steps
--- ex: [Top, Top, Top, Top, Top]
+-- ex: [Inconclusive, Inconclusive, ..., Inconclusive]  (⊤ só surge no terminal)
 ```
 
 ### 5.5. Zoom em **um autômato isolado**
@@ -251,12 +288,19 @@ Cada autômato exporta seu próprio `step`. Dá pra rodar só ele:
 ```haskell
 import qualified Monitor.Automata.A2 as A2
 let a2_0 = csM2 s0
-let a2_1 = A2.step a2_0 (events' !! 1)
+let a2_1 = A2.step a2_0 (events !! 1)
 a2_1
 ```
 
-Vale para A1, A3, A4, A6, A7, A8 também. Útil para entender uma
-propriedade específica sem o ruído das outras.
+Vale para A1 (`csM1`) e A3 (`csM3`) também — são os **três** componentes
+do produto verificado. Útil para entender uma propriedade específica sem
+o ruído das outras.
+
+> A4/A6/A7/A8 são extensões prospectivas (§6) e **não** estão em
+> `ComposedState`. Para experimentar com elas, importe o módulo isolado
+> (ex.: `import qualified Monitor.Automata.A4 as A4`) e rode
+> `A4.initial cfg` / `A4.step` à parte — elas não participam do veredito
+> composto nem do gate.
 
 ### 5.6. Reiniciar de qualquer ponto
 
@@ -264,7 +308,7 @@ Como tudo é puro (sem efeito colateral nos `step`), basta atribuir um
 novo `let`. Pode voltar reaproveitando um `s` anterior:
 
 ```haskell
-let s2_alt = step s1 (events' !! 1)   -- mesmo evento de novo
+let s2_alt = step s1 (events !! 1)   -- mesmo evento de novo
 ```
 
 ### 5.7. Recarregar após editar o código
@@ -287,8 +331,10 @@ de script (`.ghci`) com os imports e comandos prontos.
 
 ```
 ---
-cenario: "..."             # YAML opcional
-veredito_esperado: TOP
+cenario: "..."               # YAML opcional
+m_dec: {caixa_1000L: 1}      # multiconjunto declarado (M_dec)
+veredito_esperado: TOP                 # veredito composto (Proposição 2)
+status_esperado: liberado_integracao   # status do gate (§5.4)
 ---
 # comentários iniciam com #
 ab_i
@@ -300,7 +346,7 @@ match_i
 
 ### 6.1. Como o tempo é atribuído ao evento
 
-Três formas, em ordem de prioridade ([Parser.hs:73-79](src/Monitor/Parser.hs#L73-L79)):
+Três formas, em ordem de prioridade ([Parser.hs:76-83](src/Monitor/Parser.hs#L76-L83)):
 
 | Forma | Exemplo | Tempo (ms) |
 |---|---|---|
@@ -310,7 +356,7 @@ Três formas, em ordem de prioridade ([Parser.hs:73-79](src/Monitor/Parser.hs#L7
 
 Onde `i` é o **índice 0-based do evento válido** — não o número de
 linha. Linhas em branco e comentários **não** consomem índice
-([Parser.hs:60-65](src/Monitor/Parser.hs#L60-L65)).
+([Parser.hs:62-68](src/Monitor/Parser.hs#L62-L68)).
 
 Exemplo: no `trace_01_aceita_simples.txt`, sem timestamps explícitos:
 
@@ -322,89 +368,111 @@ leave_ab_i                  → i=3 → t=3000
 match_i                     → i=4 → t=4000
 ```
 
-Para forçar gaps de tempo grandes (ex.: violar A2 cujo `T_cls = 30000`),
-use timestamp explícito:
+Para forçar gaps de tempo que violem um prazo (ex.: estourar A2, cujo
+`T_cls = 1500` ms por default, ou A3, cujo `T_dec = 1700` ms), use
+timestamp explícito:
 
 ```
 ab_i
-[t=40000] rem_i
+rem_i
+leave_ab_i
+[t=5000] cls_p_i caixa_1000L 0.93   # cls chega 5 s depois — muito além de T_cls
 ```
 
 ---
 
 ## 7. Anatomia do estado
 
-### 7.1. `defaultConfig` ([Types.hs:90-102](src/Monitor/Types.hs#L90-L102))
+### 7.1. `defaultConfig` ([Types.hs:154-165](src/Monitor/Types.hs#L154-L165))
 
-Define os timeouts em ms e o τ da CNN:
+Define os prazos em ms e o τ da CNN, nos valores do cenário-âncora (§4):
 
 ```haskell
 defaultConfig = Config
-  { cfgTcls      = 30000      -- 30 s  (A2: latência de classificação)
-  , cfgTpcp      = 300000     -- 5 min (A4: prazo de escalação ao PCP)
-  , cfgTh        = 5000       -- 5 s   (A6: período máx. de heartbeat)
-  , cfgTrej      = 10000      -- 10 s  (A7: janela rej_i → cls_p_i)
-  , cfgTabMax    = 900000     -- 15 min (A8: janela máxima)
-  , cfgTau       = 0.85       -- limiar de confiança (A5)
-  , cfgValidSKUs = [ "caixa_500L", "caixa_1000L", ... ]
+  -- monitor verificado (A1–A3 + filtro A5)
+  { cfgTcls    = 1500       -- 1,5 s  (A2: latência máx. de classificação)
+  , cfgTdec    = 1700       -- T_cls + ε, com ε = 200 ms (A3: prazo de decisão)
+  , cfgDeltaMb = 100        -- δ_mb ≤ ε = T_dec − T_cls = 200 ms (latência do mes-bridge)
+  , cfgTau     = 0.85       -- limiar de confiança (A5)
+    -- extensões prospectivas (§6) — fora do monitor verificado
+  , cfgTpcp    = 300000     -- 5 min  (A4, ilustrativo — o artigo não fixa T_pcp)
+  , cfgTh      = 5000       -- 5 s    (A6)
+  , cfgTrej    = 10000      -- 10 s   (A7)
+  , cfgTabMax  = 90000      -- ~ciclo da máquina (A8)
   }
 ```
 
-### 7.2. `ComposedState` e `initial` ([Composed.hs:41-64](src/Monitor/Composed.hs#L41-L64))
+> **Mudou de v2 para v2_3:** os prazos não são mais 30 s / 31 s — agora
+> T_cls = 1500 ms e T_dec = 1700 ms. O campo `cfgValidSKUs` foi
+> **removido**; o catálogo-âncora de 7 SKUs (Figura 12) vive em
+> `Monitor.Types.anchorCatalog`, usado pelos traços e pelo `corpus-gen`.
+> Os parâmetros `cfgTpcp`/`cfgTh`/`cfgTrej`/`cfgTabMax` só são consumidos
+> pelos módulos prospectivos isolados.
+
+### 7.2. `ComposedState` e `initial` ([Composed.hs:49-64](src/Monitor/Composed.hs#L49-L64))
+
+São **três** componentes — o produto verificado é `M = M₁ ⊗ M₂ ⊗ M₃`.
+A4/A6/A7/A8 **não** estão aqui (são prospectivos, §6).
 
 ```haskell
 data ComposedState = ComposedState
-  { csM1   :: !M1     -- A1: safety rem → ab
-  , csM2   :: !M2     -- A2: TLTL cls em T_cls
-  , csM3   :: !M3     -- A3: safety leave → match ∨ div
-  , csM4   :: !M4     -- A4: TLTL esc em T_pcp
-  , csM6   :: !M6     -- A6: TLTL heartbeat em T_h
-  , csM7   :: !M7     -- A7: safety rej → cls recente
-  , csM8   :: !M8     -- A8: TLTL janela ≤ T_ab_max
-  , csObs  :: !Multiset   -- M_obs: SKUs classificados observados
+  { csM1   :: !A1.M1   -- A1: safety rem → ab
+  , csM2   :: !A2.M2   -- A2′: bounded liveness — cls confiável em T_cls
+  , csM3   :: !A3.M3   -- A3′: bounded liveness — decisão (match ∨ div) em T_dec
+  , csObs  :: !Multiset   -- M_obs da janela corrente (A5); só para exibição
   , csTau  :: !Double     -- τ replicado no nível composto
   }
 
 initial cfg = ComposedState
-  { csM1 = A1.initial          -- A1 e A3 não usam cfg (safety puro)
-  , csM2 = A2.initial cfg
-  , csM3 = A3.initial
-  , csM4 = A4.initial cfg
-  , csM6 = A6.initial cfg
-  , csM7 = A7.initial cfg
-  , csM8 = A8.initial cfg
+  { csM1  = A1.initial        -- A1 não usa cfg (safety puro)
+  , csM2  = A2.initial cfg
+  , csM3  = A3.initial cfg
   , csObs = MS.empty
   , csTau = cfgTau cfg
   }
 ```
 
 Cada autômato `M_i` carrega no próprio estado os parâmetros relevantes
-(ex.: `m2Tcls`, `m4Tpcp`). Eles ficam congelados durante a execução —
+(ex.: `m2Tcls`, `m3Tdec`). Eles ficam congelados durante a execução —
 só o campo `mXState` evolui.
 
-> A5 não tem autômato próprio — é filtro estrutural aplicado direto no
-> `step` do `Composed` via `csTau` ([Composed.hs:72-77](src/Monitor/Composed.hs#L72-L77)).
+> A5 não tem autômato próprio — é filtro estrutural (`isValidCls` de
+> `Monitor.Classification`) aplicado no `step` do `Composed` via `csTau`
+> ([Composed.hs:71-83](src/Monitor/Composed.hs#L71-L83)). A comparação
+> M_obs vs M_dec é responsabilidade do gate, não do produto.
 
-### 7.3. `Step` e `runMonitorTrace` ([Composed.hs:136-167](src/Monitor/Composed.hs#L136-L167))
+### 7.3. `Step` e `GateResult` ([Gate.hs:70-93](src/Monitor/Gate.hs#L70-L93))
+
+O `Step` (definido em `Monitor.Gate`) registra um passo sobre o fluxo
+**enriquecido**; `GateResult` é a saída completa do Algoritmo 1.
 
 ```haskell
 data Step = Step
-  { stepIdx     :: !Int
+  { stepIdx     :: !Int            -- índice 1-based no fluxo enriquecido
   , stepTime    :: !Int
   , stepEvent   :: !Event
   , stepState   :: !ComposedState
-  , stepVerdict :: !Verdict
+  , stepVerdict :: !Verdict        -- veredito de stream (domínio {⊥, ?})
   , stepRules   :: ![String]
   }
 
-runMonitorTrace
-  :: Config
-  -> [TimedEvent]
-  -> ([Step], Verdict, Maybe (Int, Event), [String])
+data GateResult = GateResult
+  { grSteps      :: ![Step]
+  , grVerdict    :: !Verdict          -- veredito composto terminal (∈ {⊥, ⊤})
+  , grStatus     :: !MesStatus        -- status terminal do gate (§5.4)
+  , grDiag       :: !(Maybe Diag)     -- causa-raiz (Nothing sse liberado)
+  , grRules      :: ![String]         -- componentes formais violados (terminal)
+  , grFirstViol  :: !(Maybe Int)      -- 1º passo com violação de stream
+  , grDivAt      :: !(Maybe Int)      -- passo em que div_i se materializou
+  , grFinalState :: !ComposedState
+  }
+
+run :: Config -> Maybe Multiset -> [TimedEvent] -> GateResult
 ```
 
-Retorna a lista detalhada de passos, o veredito final, o primeiro
-evento que decidiu (se houve), e a lista de regras por propriedade.
+`run` enriquece o fluxo (mes-bridge), aplica o produto e roteia o status
+do gate na ordem de prioridade do Algoritmo 1: sumidouro de M₁ → M₂ → M₃
+→ `div_i` → `match_i`.
 
 ---
 
@@ -420,11 +488,16 @@ Direto do shell (sem GHCi):
 ./Exec/monitor.sh --json  Files/Traces/trace_01_aceita_simples.txt
 ```
 
-Códigos de saída ([Main.hs:11-15](app/Main.hs#L11-L15)):
+Códigos de saída, derivados do **status do gate** ([Main.hs:11-16](app/Main.hs#L11-L16)):
 
-- `0` — traço aceito (⊤)
-- `1` — erro de parsing/uso ou veredito inconclusivo
-- `2` — traço violado (⊥)
+- `0` — `liberado_integracao` (LIBERAR)
+- `2` — qualquer BLOQUEAR (`divergencia_pcp` | `erro_classificacao` | `erro_decisao`)
+- `3` — `pendente_verificacao` (apontamento sem decisão terminal)
+- `1` — erro de parsing/IO/uso
+
+> O código de saída segue o **status do gate**, não o veredito composto.
+> Um traço com veredito ⊤ mas `divergencia_pcp` (ex.: `mismatch`) sai
+> com `2`, não `0`.
 
 Para depurar **só o shell** (não entra no Haskell):
 
@@ -436,40 +509,43 @@ bash -x ./Exec/monitor.sh Files/Traces/trace_01_aceita_simples.txt
 
 ```haskell
 content1 <- TIO.readFile "Files/Traces/trace_01_aceita_simples.txt"
-content2 <- TIO.readFile "Files/Traces/trace_02_<nome>.txt"
-let Right (_, ev1) = parseFile content1
-let Right (_, ev2) = parseFile content2
-let cfg = defaultConfig
-let (_, v1, _, _) = runMonitorTrace cfg (injectMesBridge cfg Nothing ev1)
-let (_, v2, _, _) = runMonitorTrace cfg (injectMesBridge cfg Nothing ev2)
-(v1, v2)
+content2 <- TIO.readFile "Files/Traces/trace_02_aceita_multiplas.txt"
+let Right (h1, ev1) = parseFile content1
+let Right (h2, ev2) = parseFile content2
+let res1 = run (applyParams h1 defaultConfig) (h1 >>= thMdec) ev1
+let res2 = run (applyParams h2 defaultConfig) (h2 >>= thMdec) ev2
+(grVerdict res1, grStatus res1, grVerdict res2, grStatus res2)
 ```
 
 ### 8.3. Encontrar onde um traço foi violado
 
 ```haskell
-let (steps, v, mFirst, rules) = runMonitorTrace cfg events'
-v
-mFirst              -- Just (i, evt) → o evento i foi o gatilho do ⊥
-rules               -- veja qual propriedade falhou
-steps !! (fst <$> mFirst <*> pure 0)   -- estado naquele ponto
+let res = run cfg mDec events
+grVerdict   res    -- veredito composto terminal
+grStatus    res    -- status do gate (a "decisão" final)
+grDiag      res    -- causa-raiz do bloqueio
+grFirstViol res    -- Just i → o passo i foi o 1º a virar ⊥ no stream
+grRules     res    -- qual(is) componente(s) violou(aram)
+grSteps res !! 0   -- estado em qualquer passo do fluxo enriquecido
 ```
 
 ### 8.4. Customizar a Config
 
 ```haskell
-let cfg2 = defaultConfig { cfgTcls = 5000 }   -- T_cls mais agressivo (5 s)
-let (_, v2, _, _) = runMonitorTrace cfg2 events'
-v2
+let cfg2 = defaultConfig { cfgTcls = 800, cfgTdec = 1000 }  -- prazos mais agressivos
+let res2 = run cfg2 mDec events
+(grVerdict res2, grStatus res2)
 ```
 
 ### 8.5. Ver tipos enquanto explora
 
 ```haskell
-:type runMonitorTrace
+:type run
 :type defaultConfig
+:info GateResult
 :info ComposedState
 :info Verdict
+:info MesStatus
 ```
 
 ### 8.6. Listar arquivos de traço
@@ -549,27 +625,32 @@ nix develop --command cabal repl exe:lab-monitor
 ```
 
 ```haskell
-:m + Main Monitor.Composed Monitor.Parser Monitor.Types Monitor.MesBridge
+:m + Main Monitor.Gate Monitor.Composed Monitor.Parser Monitor.Types Monitor.Header
 import qualified Data.Text.IO as TIO
 
 content <- TIO.readFile "Files/Traces/trace_01_aceita_simples.txt"
 let Right (hdr, events) = parseFile content
-let cfg     = defaultConfig
-let events' = injectMesBridge cfg hdr events
+let cfg  = applyParams hdr defaultConfig
+let mDec = hdr >>= thMdec
 
+-- (a) passo a passo, à mão, sobre os eventos crus do produto M₁⊗M₂⊗M₃:
 let s0 = initial cfg
-let s1 = step s0 (events' !! 0)
-let s2 = step s1 (events' !! 1)
-let s3 = step s2 (events' !! 2)
-let s4 = step s3 (events' !! 3)
-let s5 = step s4 (events' !! 4)
+let s1 = step s0 (events !! 0)
+let s2 = step s1 (events !! 1)
+let s3 = step s2 (events !! 2)
+let s4 = step s3 (events !! 3)
+let s5 = step s4 (events !! 4)
 
-let (steps, v, mFirst, rules) = runMonitorTrace cfg events'
-v
-mFirst
-rules
-mapM_ print (map stepVerdict steps)
+-- (b) resultado oficial pelo motor (fluxo enriquecido + gate):
+let res = run cfg mDec events
+grVerdict res            -- veredito composto terminal
+grStatus  res            -- status do gate
+grDiag    res            -- causa-raiz, se bloqueou
+mapM_ print (map stepVerdict (grSteps res))
 ```
 
 Imprima cada `sN` para ver os autômatos evoluindo, e compare com o
-relatório que `./Exec/monitor.sh` gera para o mesmo arquivo.
+relatório que `./Exec/monitor.sh` gera para o mesmo arquivo. Note que os
+`sN` da parte (a) percorrem os eventos **crus**, enquanto `grSteps res`
+da parte (b) percorre o fluxo **enriquecido** pelo mes-bridge — eles
+podem ter comprimentos diferentes quando o gate injeta `match_i`/`div_i`.

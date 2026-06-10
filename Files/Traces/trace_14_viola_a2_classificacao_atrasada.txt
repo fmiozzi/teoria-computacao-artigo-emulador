@@ -14,11 +14,12 @@ referencia_artigo: "Tabela 2 (A2); fig-automato-a2-tltl"
 # O MES confirma a contagem (match_i dentro de T_dec, satisfaz A3), mas a
 # classificação da CNN só chega em t=5000 — 4000 ms após o leave_ab_i em
 # t=1000, excedendo T_cls=2000. O relógio de A2, ancorado no fecho da
-# janela, expira -> sumidouro (timeout_cls_i) -> viola A2.
+# janela, expira -> sumidouro (timeout_cls) -> viola A2.
 #
 # Demais propriedades: A1 ok (rem dentro da janela); A3 ok (match em
-# t=2000, dentro de T_dec=4000); A4 ok (sem div_i). Veredito composto: BOT
-# pelo ínfimo (A2).
+# t=2000, dentro de T_dec=4000). Veredito composto: BOT pelo ínfimo (A2).
+# O gate roteia o apontamento a erro_classificacao (diag timeout_cls):
+# classificação ausente em T_cls → time de visão computacional.
 
 [t=    0] ab_i
 [t=  500] rem_i

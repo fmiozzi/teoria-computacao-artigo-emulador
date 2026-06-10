@@ -9,7 +9,7 @@
 --   cenario: "Molde vazio esquecido no MES"
 --   maquina: ROTO-01
 --   braco: 1
---   m_dec: {caixa_1000L: 2, caixa_2000L: 1}
+--   m_dec: {caixa_1000L: 2, caixa_500L: 1}
 --   veredito_esperado: TOP
 --   ---
 --   # eventos abaixo

@@ -13,11 +13,11 @@ referencia_artigo: "Tabela 2 (A3); fig-automato-a3-tltl"
 # A peça é retirada e classificada dentro da janela (A2 satisfeita). A
 # janela fecha em t=2000, mas o mes-bridge só emite o pronunciamento
 # (match_i) em t=5000 — 3000 ms depois, excedendo T_dec=2000. O relógio
-# de A3 expira -> sumidouro (leave_ab_silent_i) -> viola A3.
+# de A3 expira -> sumidouro (leave_ab_silent) -> viola A3.
 #
-# Demais propriedades: A1 ok; A2 ok (cls 0.92 >= tau durante a janela);
-# A4 ok (o div_i sintético arma A4, mas o monitor já decide BOT em A3).
-# Veredito composto: BOT pelo ínfimo (A3).
+# Demais propriedades: A1 ok; A2 ok (cls 0.92 >= tau durante a janela).
+# Veredito composto: BOT pelo ínfimo (A3). O gate roteia o apontamento a
+# erro_decisao (diag leave_ab_silent): mes-bridge mudo em T_dec → TI.
 
 [t=    0] ab_i
 [t=  500] rem_i
