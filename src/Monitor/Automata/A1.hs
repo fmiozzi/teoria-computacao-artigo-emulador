@@ -17,6 +17,9 @@
 --        ╰───╯                  ╰────╯
 --      aceitante              sumidouro
 -- @
+--
+-- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "Monitor LTL/TLTL".
+-- Referência: Tabela 2 (A1); fig-automato-a1-safety.
 module Monitor.Automata.A1
   ( M1State (..)
   , M1

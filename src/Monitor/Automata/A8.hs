@@ -10,6 +10,8 @@
 --
 -- Estrutura idêntica a A2/A4 — só muda o par de eventos (ab/leave) e
 -- o parâmetro (T_ab_max em vez de T_cls/T_pcp).
+--
+-- Extensão futura (artigo §6) — FORA do monitor composto da v2 (M1⊗M2⊗M3⊗M4).
 module Monitor.Automata.A8
   ( M8State (..)
   , M8

@@ -8,11 +8,15 @@
 --
 -- 'Config' agrega os parâmetros temporais e o limiar de A5. Na Peça 1
 -- (atual) só a estrutura existe; as próximas peças passam a consumi-la.
+--
+-- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "Máquina de rotomoldagem multi-braço".
+-- Referência: Tabela 2 (eventos/AP).
 module Monitor.Types
   ( -- * Eventos
     Event (..)
   , showEvent
   , TimedEvent (..)
+  , Clock
     -- * Veredito
   , Verdict (..)
   , showVerdict
@@ -39,6 +43,10 @@ data Event
   | Heartbeat            -- ^ heartbeat: sinal de vida do agente (A6)
   | RejI                 -- ^ rej_i: peça marcada como refugo (A7)
   deriving (Eq, Show)
+
+-- | Relógio do monitor temporizado, em milissegundos desde o início do
+-- traço. Usado pelas guardas dos autômatos TLTL (A2, A3, A4).
+type Clock = Int
 
 -- | Evento com timestamp em milissegundos desde o início do traço.
 --
@@ -79,6 +87,7 @@ parseVerdict s = case map toUpper (trim s) of
 -- | Parâmetros do monitor (defaults definidos por 'defaultConfig').
 data Config = Config
   { cfgTcls      :: Int       -- ^ T_cls (ms): latência máxima de classificação (A2)
+  , cfgTdec      :: Int       -- ^ T_dec (ms): prazo de decisão do mes-bridge (A3); T_dec ≥ T_cls
   , cfgTpcp      :: Int       -- ^ T_pcp (ms): prazo de escalação ao PCP (A4)
   , cfgTh        :: Int       -- ^ T_h (ms): período máximo entre heartbeats (A6)
   , cfgTrej      :: Int       -- ^ T_rej (ms): janela em que rej_i pode se referir a cls (A7)
@@ -90,6 +99,7 @@ data Config = Config
 defaultConfig :: Config
 defaultConfig = Config
   { cfgTcls      = 30000      -- 30 s
+  , cfgTdec      = 31000      -- T_cls + ε (ε = 1 s): prazo de decisão do mes-bridge
   , cfgTpcp      = 300000     -- 5 min
   , cfgTh        = 5000       -- 5 s
   , cfgTrej      = 10000      -- 10 s (janela para rej_i referir-se a cls_p_i)
@@ -101,10 +111,12 @@ defaultConfig = Config
       ]
   }
 
+-- | Renderização canônica LTL₃ (símbolo + nome), sem variações regionais
+-- e sem o sufixo booleano @(T)@/@(F)@ — ⊤/⊥ não são "true/false" em LTL₃.
 showVerdict :: Verdict -> String
-showVerdict Top          = "ACEITA (T)"
-showVerdict Bot          = "VIOLA  (F)"
-showVerdict Inconclusive = "INCONCLUSIVO (?)"
+showVerdict Top          = "⊤  (Top — Aceita)"
+showVerdict Bot          = "⊥  (Bot — Viola)"
+showVerdict Inconclusive = "?  (Inconclusive)"
 
 showEvent :: Event -> String
 showEvent AbI         = "ab_i"

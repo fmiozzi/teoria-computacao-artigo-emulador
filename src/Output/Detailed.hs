@@ -9,6 +9,9 @@
 -- Campos que dependeriam de dados ausentes do header (impacto contábil,
 -- ações operacionais detalhadas) são omitidos — só renderizamos o que
 -- temos.
+--
+-- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "ERP".
+-- Referência: §5.2; fig-fluxograma-gate.
 module Output.Detailed
   ( renderDetailed
   ) where
@@ -19,19 +22,15 @@ import qualified Monitor.Automata.A1    as A1
 import qualified Monitor.Automata.A2    as A2
 import qualified Monitor.Automata.A3    as A3
 import qualified Monitor.Automata.A4    as A4
-import qualified Monitor.Automata.A6    as A6
-import qualified Monitor.Automata.A7    as A7
-import qualified Monitor.Automata.A8    as A8
 import           Monitor.Composed       ( ComposedState (..)
                                         , Step (..)
                                         , finalVerdict
                                         , summary
                                         )
+import qualified Monitor.Gate           as Gate
 import           Monitor.Header         (TraceHeader (..))
-import qualified Monitor.Multiset       as MS
 import           Monitor.Multiset       (Multiset)
 import           Monitor.Types          ( Config (..)
-                                        , Event
                                         , Verdict (..)
                                         , showEvent
                                         , showVerdict
@@ -83,8 +82,8 @@ headerLines :: [String]
 headerLines =
   [ sep
   , "EMULADOR LTL/TLTL — Monitor de Apontamento de Produção"
-  , "Versão " ++ version ++ " — A1, A2, A3, A4, A5 + extensões A6, A7, A8"
-  , "Referência: Miozzi (2026), §4–6"
+  , "Versão " ++ version ++ " — monitor composto M₁⊗M₂⊗M₃⊗M₄ (A1–A4) + filtro A5"
+  , "Referência: Miozzi (2026), Tabela 2 (A1–A5)"
   , sep
   , ""
   ]
@@ -113,10 +112,8 @@ parameters cfg =
   [ ""
   , "Parâmetros do monitor:"
   , "  T_cls    = " ++ show (cfgTcls cfg)   ++ " ms   (A2)"
+  , "  T_dec    = " ++ show (cfgTdec cfg)   ++ " ms   (A3)"
   , "  T_pcp    = " ++ show (cfgTpcp cfg)   ++ " ms   (A4)"
-  , "  T_h      = " ++ show (cfgTh cfg)     ++ " ms   (A6)"
-  , "  T_rej    = " ++ show (cfgTrej cfg)   ++ " ms   (A7)"
-  , "  T_ab_max = " ++ show (cfgTabMax cfg) ++ " ms   (A8)"
   , "  τ        = " ++ show (cfgTau cfg)    ++ "        (A5)"
   ]
 
@@ -150,29 +147,29 @@ finalSection steps =
 perPropertyVerdicts :: Maybe ComposedState -> [String]
 perPropertyVerdicts Nothing  = []
 perPropertyVerdicts (Just s) =
-  [ "  A1 (safety: rem → ab)              : " ++ verdictSymFinal (A1.finalVerdict (csM1 s))
-  , "  A2 (TLTL: cls em T_cls)            : " ++ verdictSymFinal (A2.finalVerdict (csM2 s))
-  , "  A3 (safety: leave → match ∨ div)   : " ++ verdictSymFinal (A3.finalVerdict (csM3 s))
-  , "  A4 (TLTL: esc em T_pcp)            : " ++ verdictSymFinal (A4.finalVerdict (csM4 s))
-  , "  A5 (filtro confiança ≥ τ)           : ⊤  (filtro estrutural — sempre OK)"
-  , "  A6 (TLTL: heartbeat em T_h)        : " ++ verdictSymFinal (A6.finalVerdict (csM6 s))
-  , "  A7 (safety: rej → cls recente)     : " ++ verdictSymFinal (A7.finalVerdict (csM7 s))
-  , "  A8 (TLTL: janela ≤ T_ab_max)       : " ++ verdictSymFinal (A8.finalVerdict (csM8 s))
-  , "  Veredito final composto            : " ++ verdictSymFinal (finalVerdict s)
+  [ "  A1 (safety: rem → ab)                  : " ++ verdictSymFinal (A1.finalVerdict (csM1 s))
+  , "  A2 (liveness temp.: cls^≥τ em T_cls)   : " ++ verdictSymFinal (A2.finalVerdict (csM2 s))
+  , "  A3 (liveness temp.: match∨div em T_dec): " ++ verdictSymFinal (A3.finalVerdict (csM3 s))
+  , "  A4 (liveness temp.: esc em T_pcp)      : " ++ verdictSymFinal (A4.finalVerdict (csM4 s))
+  , "  A5 (filtro confiança ≥ τ)              : ⊤  (filtro estrutural a montante)"
+  , "  Veredito final composto                : " ++ verdictSymFinal (finalVerdict s)
   ]
 
+-- | Renderiza a decisão do gate (Algoritmo 1) a partir de
+-- 'Monitor.Gate.decide'.
 gateDecision :: Verdict -> Maybe Int -> [String] -> [String]
-gateDecision Top _ _ =
-  [ "  Decisão  : LIBERAR integração MES → ERP"
-  , "  Motivo   : todas as propriedades formais satisfeitas (match_i implícito ou explícito)"
-  ]
-gateDecision Bot mFirst rules =
-  [ "  Decisão  : BLOQUEAR integração MES → ERP"
-  , "  Motivo   : " ++ ruleSentence rules
-  ] ++ locationLine mFirst
-gateDecision Inconclusive _ _ =
-  [ "  Decisão  : INCONCLUSIVO — aguardando mais eventos"
-  ]
+gateDecision v mFirst rules = case Gate.decide v rules of
+  Gate.Liberar ->
+    [ "  Decisão  : LIBERAR integração MES → ERP"
+    , "  Motivo   : todas as propriedades formais satisfeitas (match_i implícito ou explícito)"
+    ]
+  Gate.Bloquear _ | v == Inconclusive ->
+    [ "  Decisão  : INCONCLUSIVO — aguardando mais eventos"
+    ]
+  Gate.Bloquear rs ->
+    [ "  Decisão  : BLOQUEAR integração MES → ERP"
+    , "  Motivo   : " ++ ruleSentence rs
+    ] ++ locationLine mFirst
 
 ruleSentence :: [String] -> String
 ruleSentence []  = "violação detectada (sem detalhe disponível)"
@@ -213,7 +210,7 @@ lastState xs = Just (stepState (last xs))
 exitCodeOf :: Verdict -> Int
 exitCodeOf Top          = 0
 exitCodeOf Bot          = 2
-exitCodeOf Inconclusive = 1
+exitCodeOf Inconclusive = 3
 
 intercalate :: String -> [String] -> String
 intercalate _   []     = ""

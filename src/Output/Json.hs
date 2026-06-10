@@ -12,13 +12,16 @@
 -- {
 --   "file": "Files/Traces/trace_08_...",
 --   "header": { ... | null },
---   "config": { "t_cls": 30000, "t_pcp": 300000, "tau": 0.85 },
---   "steps":  [ { "i": 1, "t": 0, "event": "ab_i", "verdict": "T", ... }, ... ],
---   "verdict": "F",
+--   "config": { "t_cls": 30000, "t_dec": 31000, "t_pcp": 300000, "tau": 0.85 },
+--   "steps":  [ { "i": 1, "t": 0, "event": "ab_i", "verdict": "TOP", ... }, ... ],
+--   "verdict": "BOT",
 --   "first_violation_idx": 4 | null,
 --   "violating_rules": ["A1", "A3"]
 -- }
 -- @
+--
+-- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "ERP".
+-- Referência: §5.2 (log auditável).
 module Output.Json
   ( renderJson
   ) where
@@ -73,9 +76,8 @@ headerToJValue h = JObj
 configToJValue :: Config -> JValue
 configToJValue cfg = JObj
   [ ("t_cls", JInt (cfgTcls cfg))
+  , ("t_dec", JInt (cfgTdec cfg))
   , ("t_pcp", JInt (cfgTpcp cfg))
-  , ("t_h"  , JInt (cfgTh cfg))
-  , ("t_ab_max", JInt (cfgTabMax cfg))
   , ("tau"  , JDbl (cfgTau cfg))
   ]
 
@@ -96,9 +98,9 @@ multisetToJValue m = JObj
   [ (T.unpack k, JInt v) | (k, v) <- Map.toAscList m ]
 
 verdictTag :: Verdict -> String
-verdictTag Top          = "T"
-verdictTag Bot          = "F"
-verdictTag Inconclusive = "?"
+verdictTag Top          = "TOP"
+verdictTag Bot          = "BOT"
+verdictTag Inconclusive = "INCONCLUSIVE"
 
 eventTag :: Event -> String
 eventTag AbI         = "ab_i"
@@ -108,6 +110,7 @@ eventTag MatchI      = "match_i"
 eventTag DivI        = "div_i"
 eventTag EscPcpI     = "esc_pcp_i"
 eventTag Heartbeat   = "heartbeat"
+eventTag RejI        = "rej_i"
 eventTag (ClsPI _ _) = "cls_p_i"
 
 eventRepr :: Event -> String

@@ -1,11 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Produto sincronizado dos autômatos M_k (Proposição 2 do artigo) +
--- extensões A6/A7/A8 da Fase 10.
+-- | Produto sincronizado dos autômatos de monitoramento — o monitor
+-- composto M = M_1 ⊗ M_2 ⊗ M_3 ⊗ M_4 do artigo (v2).
 --
 -- O veredito composto é o ínfimo dos vereditos individuais no reticulado
 -- ⊥ < ? < ⊤. Como ⊥ é absorvente em cada componente, basta o autômato
 -- individual mais pessimista para determinar o veredito composto.
+--
+-- /Eventos derivados/: o sumidouro de M_2 (timeout_cls_i) e o de M_3
+-- (leave_ab_silent_i) são disjuntos de @div_i@ (cf. definição de div_i no
+-- artigo). Quando M_2 ou M_3 viola por expiração de relógio, esta
+-- composição promove um @div_i@ sintético no mesmo instante, armando M_4
+-- (escalação ao PCP).
+--
+-- As propriedades A6/A7/A8 são extensões de trabalho futuro (artigo §6) e
+-- /não/ fazem parte do monitor composto da v2 — vivem em
+-- "Monitor.Automata.A6"/"A7"/"A8" isoladas.
 module Monitor.Composed
   ( -- * Estado
     ComposedState (..)
@@ -26,10 +36,8 @@ module Monitor.Composed
 import qualified Monitor.Automata.A1 as A1
 import qualified Monitor.Automata.A2 as A2
 import qualified Monitor.Automata.A3 as A3
-import qualified Monitor.Automata.A4 as A4
-import qualified Monitor.Automata.A6 as A6
-import qualified Monitor.Automata.A7 as A7
-import qualified Monitor.Automata.A8 as A8
+import qualified Monitor.Automata.A4   as A4
+import           Monitor.Classification (isValidCls)
 import qualified Monitor.Multiset    as MS
 import           Monitor.Multiset    (Multiset)
 import           Monitor.Types       ( Config (..)
@@ -43,9 +51,6 @@ data ComposedState = ComposedState
   , csM2   :: !A2.M2
   , csM3   :: !A3.M3
   , csM4   :: !A4.M4
-  , csM6   :: !A6.M6
-  , csM7   :: !A7.M7
-  , csM8   :: !A8.M8
   , csObs  :: !Multiset
   , csTau  :: !Double
   } deriving (Eq, Show)
@@ -54,11 +59,8 @@ initial :: Config -> ComposedState
 initial cfg = ComposedState
   { csM1  = A1.initial
   , csM2  = A2.initial cfg
-  , csM3  = A3.initial
+  , csM3  = A3.initial cfg
   , csM4  = A4.initial cfg
-  , csM6  = A6.initial cfg
-  , csM7  = A7.initial cfg
-  , csM8  = A8.initial cfg
   , csObs = MS.empty
   , csTau = cfgTau cfg
   }
@@ -67,22 +69,27 @@ step :: ComposedState -> TimedEvent -> ComposedState
 step s te =
   let evt  = teEvent te
       now  = teTime te
+      -- M_obs acumula apenas classificações confiáveis (filtro A5).
       obs' = case evt of
-        ClsPI sku conf
-          | conf >= csTau s -> MS.addCls sku (csObs s)
-          | otherwise       -> csObs s
-        RejI -> case A7.lastClsValid (csM7 s) now of
-          Just sku -> MS.removeCls sku (csObs s)
-          Nothing  -> csObs s
+        ClsPI sku _
+          | isValidCls (csTau s) evt -> MS.addCls sku (csObs s)
+          | otherwise                -> csObs s
         _ -> csObs s
+      m1' = A1.step (csM1 s) evt
+      m2' = A2.step (csM2 s) te
+      m3' = A3.step (csM3 s) te
+      -- div_i sintético: timeout de M_2 (timeout_cls_i) ou de M_3
+      -- (leave_ab_silent_i) arma M_4 no mesmo instante.
+      a2JustViolated = A2.verdict m2' == Bot && A2.verdict (csM2 s) /= Bot
+      a3JustViolated = A3.verdict m3' == Bot && A3.verdict (csM3 s) /= Bot
+      m4Base = A4.step (csM4 s) te
+      m4' | a2JustViolated || a3JustViolated = A4.step m4Base (TimedEvent now DivI)
+          | otherwise                        = m4Base
   in s
-    { csM1  = A1.step (csM1 s) evt
-    , csM2  = A2.step (csM2 s) te
-    , csM3  = A3.step (csM3 s) evt
-    , csM4  = A4.step (csM4 s) te
-    , csM6  = A6.step (csM6 s) te
-    , csM7  = A7.step (csM7 s) te
-    , csM8  = A8.step (csM8 s) te
+    { csM1  = m1'
+    , csM2  = m2'
+    , csM3  = m3'
+    , csM4  = m4'
     , csObs = obs'
     }
 
@@ -90,16 +97,12 @@ verdict :: ComposedState -> Verdict
 verdict s = minimum
   [ A1.verdict (csM1 s), A2.verdict (csM2 s)
   , A3.verdict (csM3 s), A4.verdict (csM4 s)
-  , A6.verdict (csM6 s), A7.verdict (csM7 s)
-  , A8.verdict (csM8 s)
   ]
 
 finalVerdict :: ComposedState -> Verdict
 finalVerdict s = minimum
   [ A1.finalVerdict (csM1 s), A2.finalVerdict (csM2 s)
   , A3.finalVerdict (csM3 s), A4.finalVerdict (csM4 s)
-  , A6.finalVerdict (csM6 s), A7.finalVerdict (csM7 s)
-  , A8.finalVerdict (csM8 s)
   ]
 
 violatingRules :: ComposedState -> [String]
@@ -107,8 +110,6 @@ violatingRules s =
   [ n | (v, n) <-
       [ (A1.verdict (csM1 s), "A1"), (A2.verdict (csM2 s), "A2")
       , (A3.verdict (csM3 s), "A3"), (A4.verdict (csM4 s), "A4")
-      , (A6.verdict (csM6 s), "A6"), (A7.verdict (csM7 s), "A7")
-      , (A8.verdict (csM8 s), "A8")
       ], v == Bot
   ]
 
@@ -117,8 +118,6 @@ finalViolatingRules s =
   [ n | (v, n) <-
       [ (A1.finalVerdict (csM1 s), "A1"), (A2.finalVerdict (csM2 s), "A2")
       , (A3.finalVerdict (csM3 s), "A3"), (A4.finalVerdict (csM4 s), "A4")
-      , (A6.finalVerdict (csM6 s), "A6"), (A7.finalVerdict (csM7 s), "A7")
-      , (A8.finalVerdict (csM8 s), "A8")
       ], v == Bot
   ]
 
@@ -128,9 +127,6 @@ summary s = unwords
   , "M2:" ++ A2.summary (csM2 s)
   , "M3:" ++ A3.summary (csM3 s)
   , "M4:" ++ A4.summary (csM4 s)
-  , "M6:" ++ A6.summary (csM6 s)
-  , "M7:" ++ A7.summary (csM7 s)
-  , "M8:" ++ A8.summary (csM8 s)
   ]
 
 data Step = Step

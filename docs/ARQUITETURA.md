@@ -1,177 +1,107 @@
 # Arquitetura do Emulador
 
-Este documento descreve, em uma página, como os módulos do projeto se
-encaixam — do parser ao output — e como o monitor composto $M = M_1
-\otimes M_2 \otimes \cdots \otimes M_8$ é construído.
+Este documento descreve como os módulos do emulador realizam os blocos da
+figura de arquitetura de referência (v2) do artigo, do agente de visão ao
+ERP. O núcleo executável é o monitor composto `M = M1 ⊗ M2 ⊗ M3 ⊗ M4`
+(propriedades A1–A4, Tabela 2), com o filtro A5 aplicado a montante.
 
-## Visão geral
+## Mapeamento figura → código
 
-```
-            ┌────────────────────────┐
-arquivo ──▶ │  Monitor.Parser        │  parseFile  (Maybe TraceHeader, [TimedEvent])
-de traço    └────────────┬───────────┘
-                         │
-                         ▼
-            ┌────────────────────────┐
-            │  Monitor.MesBridge     │  injectMesBridge cfg hdr events
-            │  (pré-processador)     │   ► insere match_i/div_i no leave_ab_i
-            └────────────┬───────────┘     se o traço não pronunciar
-                         │
-                         ▼  [TimedEvent]
-            ┌────────────────────────┐
-            │  Monitor.Composed      │  runMonitorTrace cfg events
-            │   ┌──────┬──────┬────┐ │   ► foldl step (initial cfg) events
-            │   │ M1   │ M2   │ M3 │ │
-            │   ├──────┼──────┼────┤ │   verdict s     = ínfimo dos 7 componentes
-            │   │ M4   │ M6   │ M7 │ │   finalVerdict  = idem para fim do traço
-            │   ├──────┴──────┴────┤ │
-            │   │ M8 + csObs/csTau │ │
-            │   └──────────────────┘ │
-            └────────────┬───────────┘
-                         │
-                         ▼  (steps, verdict, mFirstViol, rules)
-        ┌──────────┬─────┴─────┬───────────┐
-        ▼          ▼           ▼           ▼
-   ┌─────────┐ ┌─────────┐ ┌─────────┐
-   │ Plain   │ │ Detailed│ │ Json    │   (selecionados pela flag CLI)
-   │ --quiet │ │ default │ │ --json  │
-   └─────────┘ └─────────┘ └─────────┘
-```
+### Máquina de rotomoldagem multi-braço — `Monitor.Types`
 
-## Tipos centrais
+Define o vocabulário de eventos atômicos (`ab_i`, `rem_i`, `leave_ab_i`,
+`match_i`, `div_i`, `esc_pcp_i`, `cls_p_i`) e os tipos de domínio: `Event`,
+`TimedEvent`, `Verdict` e `Config`. O reticulado de vereditos é dado por
+`data Verdict = Bot | Inconclusive | Top` com a ordem `⊥ < ? < ⊤`. Os
+parâmetros temporizados (`T_cls`, `T_dec`, `T_pcp`) e o limiar `τ` residem em
+`Config`. Representa a planta observada: a máquina cujos eventos físicos
+alimentam toda a cadeia.
 
-```haskell
--- Monitor.Types
-data Event = AbI | RemI | LeaveAbI | MatchI | DivI | EscPcpI
-           | ClsPI Text Double | Heartbeat | RejI
+### Câmera + agente de visão — `Monitor.Parser`
 
-data TimedEvent = TimedEvent { teTime :: !Int, teEvent :: !Event }
+Lê o arquivo de traço (cabeçalho mais fluxo de eventos com marcação temporal)
+e o converte em `[TimedEvent]`. Simula o agente de visão que, em produção,
+emite o fluxo de eventos a partir das imagens. O formato é especificado em
+[FORMATO_TRACE.md](FORMATO_TRACE.md); este módulo não o duplica.
 
-data Verdict = Bot | Inconclusive | Top
-  deriving (Eq, Ord, Show)    -- reticulado: Bot < Inconclusive < Top
+### Pipeline de inferência (CNN), A5 — `Monitor.Classification`
 
-data Config = Config
-  { cfgTcls      :: Int       -- T_cls em ms     (A2)
-  , cfgTpcp      :: Int       -- T_pcp em ms     (A4)
-  , cfgTh        :: Int       -- T_h em ms       (A6)
-  , cfgTrej      :: Int       -- T_rej em ms     (A7)
-  , cfgTabMax    :: Int       -- T_ab_max em ms  (A8)
-  , cfgTau       :: Double    -- limiar τ        (A5)
-  , cfgValidSKUs :: [Text]
-  }
-```
+Implementa o filtro estrutural A5 via `filterByTau`/`isValidCls`: apenas
+classificações com confiança `conf ≥ τ` contribuem para `M_obs` e satisfazem
+a obrigação de A2. A5 é uma restrição estrutural a montante, não uma fórmula
+LTL/TLTL — por isso não há autômato `M5` no produto. O filtro é consultado
+tanto pelo `MesBridge` (ao montar `M_obs`) quanto pelo `Monitor.Composed`
+(ao acumular `csObs`).
 
-## Estado do monitor composto
+### MES (`M_obs`/`M_dec`) — `Monitor.Multiset`, `Monitor.MesBridge`
 
-```haskell
--- Monitor.Composed
-data ComposedState = ComposedState
-  { csM1   :: !A1.M1   -- safety: G(rem → ab)
-  , csM2   :: !A2.M2   -- TLTL  : G(rem → F[T_cls] cls)
-  , csM3   :: !A3.M3   -- safety: G(leave → match ∨ div)
-  , csM4   :: !A4.M4   -- TLTL  : G(div → F[T_pcp] esc_pcp)
-  , csM6   :: !A6.M6   -- TLTL  : G F[T_h] heartbeat
-  , csM7   :: !A7.M7   -- safety: G(rej → cls recente)
-  , csM8   :: !A8.M8   -- TLTL  : G(ab → F[T_ab_max] leave)
-  , csObs  :: !Multiset      -- M_obs acumulado (A5 já filtrou)
-  , csTau  :: !Double        -- limiar para acumular em csObs
-  }
-```
+`Monitor.Multiset` modela o apontamento como multiconjuntos e oferece a
+comparação `compareMs`. `Monitor.MesBridge` realiza a ponte descrita em §5.4:
+ao chegar em `leave_ab_i` sem que o traço pronuncie `match_i`/`div_i`, ele
+compara o `M_obs` acumulado (já filtrado por A5) com o `M_dec` declarado no
+cabeçalho e injeta o evento ausente no mesmo instante. Sem cabeçalho ou sem
+`m_dec`, o traço passa intacto.
 
-Adicionar uma nova propriedade $A_n$ é mecânico:
+### Monitor LTL/TLTL (ínfimo, Proposição 2) — `Monitor.Automata.A1`–`A4`, `Monitor.Composed`
 
-1. Criar `Monitor.Automata.An` com `MnState`, `Mn`, `initial`, `step`,
-   `verdict`, `finalVerdict`, `summary` (mesma assinatura dos outros).
-2. Adicionar campo `csMn` em `ComposedState`.
-3. Atualizar `initial`, `step`, `verdict`, `finalVerdict`,
-   `violatingRules`, `finalViolatingRules`, `summary`.
-4. Acrescentar entrada em `describeRule` (Output.Plain) e
-   `perPropertyVerdicts` (Output.Detailed).
-5. Adicionar `Monitor.Automata.An` em `lab-monitor.cabal`.
+Cada propriedade é um autômato de monitoramento independente: `A1` (safety
+`G(rem_{i,j} → ab_i)`), `A2` (liveness temporizada com relógio `T_cls`
+ancorado em `leave_ab_i`), `A3` (liveness temporizada com `T_dec`) e `A4`
+(liveness temporizada com `T_pcp`). `Monitor.Composed` mantém o estado
+sincronizado (`ComposedState`) e calcula o veredito como o ínfimo dos
+componentes no reticulado `⊥ < ? < ⊤`. Pela Proposição 2, esse ínfimo é o
+veredito correto do produto; como `⊥` é absorvente em cada componente, o
+autômato mais pessimista determina o resultado. O módulo expõe um veredito de
+stream (`verdict`, a cada passo) e um veredito terminal (`finalVerdict`, que
+captura obrigações temporizadas ainda pendentes ao fim do traço).
 
-A Proposição 2 do artigo garante que a composição preserva a corretude.
+### Gate MES↔ERP (Algoritmo 1) — `Monitor.Gate`
 
-## Pipeline de execução
+Traduz o veredito composto em decisão operacional: `⊤` libera a integração;
+`⊥` bloqueia listando as regras `A_k` violadas; `?` é tratado com cautela
+como bloqueio sem regras, aguardando mais eventos. Implementa o Algoritmo 1
+(decisão online).
 
-```haskell
-processFile :: Mode -> FilePath -> IO ()
-processFile mode fp = do
-  txt <- TIO.readFile fp
-  case parseFile txt of
-    Left  err -> failWith err
-    Right (hdr, events) ->
-      let cfg     = defaultConfig
-          events' = injectMesBridge cfg hdr events     -- ① pré-processa
-          (steps, v, mFirst, rules) =
-              runMonitorTrace cfg events'              -- ② executa
-      in case mode of
-           ModeQuiet    -> renderPlain    ...
-           ModeDetailed -> renderDetailed ...
-           ModeJson     -> renderJson     ...
-```
+### ERP (renderização do veredito) — `Output.Plain`, `Output.Detailed`, `Output.Json`
 
-## Verdict de stream vs. terminal
+Renderizam o resultado para consumo a jusante (papel do ERP): bloco curto
+(`--quiet`), relatório detalhado evento-a-evento (padrão) e JSON estruturado
+(`--json`). A renderização canônica do veredito segue Bauer, Leucker e
+Schallhart (2011): `⊤`/`⊥`/`?`.
 
-Cada componente expõe **dois** vereditos:
+### Ponto de entrada (CLI) — `app/Main.hs`
 
-| Função | Quando consultar | Como usa |
-|--------|------------------|----------|
-| `verdict` | a cada step do stream | Sumidouro absorvente — uma vez ⊥, sempre ⊥. |
-| `finalVerdict` | uma única vez ao fim | Captura "obrigações pendentes" (e.g., `M3Awaiting`, `M4Pending`). |
+Orquestra a cadeia: faz o parsing, aplica os parâmetros do cabeçalho sobre os
+defaults, invoca o `MesBridge`, executa o `Monitor.Composed` e seleciona o
+renderizador de saída conforme a flag. Mapeia o veredito final aos códigos de
+saída `0` (`⊤`), `2` (`⊥`), `3` (`?`) e `1` (erro).
 
-Em geral, para safety pura (A1, A6, A7): `finalVerdict = verdict`. Para
-TLTL (A2, A3, A4, A8): `finalVerdict` pode ser ⊥ mesmo que `verdict` seja
-⊤ — porque o tempo "parou" no último evento do traço com obrigação ainda
-aberta.
+## Encadeamento de eventos derivados (A2/A3 → `div_i` → A4)
 
-A composição é ínfimo dos vereditos individuais:
+O evento derivado é `div_i := mismatch_i ∨ timeout_cls_i ∨
+leave_ab_silent_i ∨ fora_ciclo_i`. Os sumidouros de A2 (`timeout_cls_i`,
+expiração do relógio `T_cls`) e de A3 (`leave_ab_silent_i`, expiração de
+`T_dec`) são, portanto, espécies de divergência. Quando A2 ou A3 viola por
+expiração de relógio durante o stream, `Monitor.Composed.step` promove um
+`div_i` sintético no mesmo instante, armando A4 (escalação ao PCP). Assim, um
+silêncio temporizado de A2/A3 propaga-se para a obrigação de escalação de A4,
+em vez de se perder no veredito composto. O cenário `trace_13` exercita esse
+encadeamento: o filtro A5 esvazia `M_obs`, A2 fica pendente e o `MesBridge`
+injeta `div_i`, resultando nas regras `A2 A4`.
 
-```haskell
-verdict      s = minimum [A1.verdict      (csM1 s), ..., A8.verdict      (csM8 s)]
-finalVerdict s = minimum [A1.finalVerdict (csM1 s), ..., A8.finalVerdict (csM8 s)]
-```
+## Propriedades A6–A8 (trabalho futuro)
 
-## Pré-processamento (mes-bridge)
+A6 (heartbeat Armed/Unarmed), A7 (efeito colateral `rej_i`) e A8 (janela
+limitada por `T_ab_max`) são extensões de trabalho futuro (artigo §6). Seus
+autômatos (`Monitor.Automata.A6`/`A7`/`A8`) permanecem no repositório, mas
+isolados: não integram `Monitor.Composed`, a contagem de propriedades nem a
+suíte canônica. Os traços correspondentes ficam em `Files/Traces/extras/`.
+A5, por sua vez, não é trabalho futuro: é o filtro estrutural já ativo em
+`Monitor.Classification`, aplicado a montante do monitor composto.
 
-`Monitor.MesBridge` simula o componente externo descrito em §5.4 do
-artigo. Ele varre o traço uma vez, mantendo um `M_obs` próprio
-(independente do que o monitor faz):
+## Referências cruzadas
 
-1. `ClsPI sku conf` com `conf ≥ τ` → incrementa `M_obs[sku]`.
-2. `LeaveAbI`:
-   - se o próximo evento já é `MatchI`/`DivI`: deixa o traço prevalecer;
-   - senão: insere `MatchI` se `M_obs = M_dec`, `DivI` caso contrário,
-     com o mesmo timestamp do `LeaveAbI`.
-
-Sem header ou sem `m_dec`, o traço passa intacto (caminho legado).
-
-## Decisão sobre testes
-
-A suite Tasty está organizada em três grupos:
-
-| Grupo | Propósito | Tamanho |
-|-------|-----------|---------|
-| `ExampleTraces` | Cada arquivo em `Files/Traces/` e `Files/Smoke/` vira um caso HUnit. Compara veredito final com `veredito_esperado` do header. | 16 casos |
-| `CompositionProps` | QuickCheck: para qualquer sequência de `TimedEvent`s, `verdict s == minimum [verdict componentes]`. Ídem para `finalVerdict`. | 200×2 runs |
-| `AbsorbingProps` | QuickCheck: se prefixo levou a ⊥, sufixo mantém ⊥. Corolário "stream ⊥ ⇒ terminal ⊥". | 200×2 runs |
-
-`AbsorbingProps` carrega as instâncias `Arbitrary` definidas em
-`CompositionProps` via `import CompositionProps ()`.
-
-## Trade-offs deliberados
-
-- **Parser YAML ad-hoc** (Fase 2). Subset suficiente cabe em ~110 linhas;
-  evitamos `libyaml + aeson` e o patch correspondente no `flake.nix`.
-  Se precisarmos de listas/nested objects (e.g., `ops:`), migrar para a
-  lib `yaml` afeta só `Monitor/Header.hs`.
-- **Output JSON ad-hoc** (Fase 7). Mesmo raciocínio. Trocar por `aeson`
-  daria schema validation/streaming, ao custo de mais deps.
-- **A5 embutido em A2** (Fase 4). Não há autômato $M_5$ separado — A5 é
-  filtro estrutural, não temporal.
-- **A6 "armed/unarmed"** (Fase 10). Leitura literal de
-  $G F_{[0,T_h]} heartbeat$ seria estrita demais para traços históricos
-  sem heartbeat. Operacionalmente, A6 só "arma" no primeiro heartbeat.
-- **M_obs duplicado** (MesBridge mantém um, ComposedState mantém outro).
-  Aceito porque MesBridge é pré-processador (não enxerga o estado de
-  runtime); a alternativa (`Composed` chamando `MesBridge.peek`) cruzaria
-  a fronteira entre os dois.
+- [DECISOES.md](DECISOES.md) — decisões de projeto e suas justificativas
+  canônicas (fonte de verdade).
+- [CENARIOS.md](CENARIOS.md) — análise dos cenários e matriz propriedade ×
+  cenário.

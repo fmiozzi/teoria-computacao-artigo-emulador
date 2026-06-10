@@ -19,8 +19,10 @@ library
         Monitor.Types
       , Monitor.Parser
       , Monitor.Header
+      , Monitor.Classification
       , Monitor.Multiset
       , Monitor.MesBridge
+      , Monitor.Gate
       , Monitor.Automata.A1
       , Monitor.Automata.A2
       , Monitor.Automata.A3
@@ -55,6 +57,7 @@ test-suite lab-monitor-test
         ExampleTraces
       , CompositionProps
       , AbsorbingProps
+      , UnitProps
     build-depends:
         base,
         text,

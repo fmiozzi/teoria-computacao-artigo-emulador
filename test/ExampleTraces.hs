@@ -13,7 +13,7 @@ import           Test.Tasty         (TestTree, testGroup)
 import           Test.Tasty.HUnit   (testCase, assertEqual, assertFailure)
 
 import           Monitor.Composed   (runMonitor)
-import           Monitor.Header     (TraceHeader (..))
+import           Monitor.Header     (TraceHeader (..), applyParams)
 import           Monitor.MesBridge  (injectMesBridge)
 import           Monitor.Parser     (parseFile)
 import           Monitor.Types      (defaultConfig)
@@ -38,7 +38,7 @@ mkTest fp = testCase fp $ do
   case parseFile content of
     Left err -> assertFailure ("erro de parsing: " ++ err)
     Right (hdr, events) -> do
-      let cfg     = defaultConfig
+      let cfg     = applyParams hdr defaultConfig
           events' = injectMesBridge cfg hdr events
           (v, _, _) = runMonitor cfg events'
       case hdr >>= thExpected of

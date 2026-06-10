@@ -12,6 +12,9 @@
 -- A construção é estruturalmente idêntica a 'Monitor.Automata.A2', mas
 -- sem o filtro A5: @esc_pcp_i@ não carrega confiança da CNN — é um
 -- ato administrativo do agente/integrador.
+--
+-- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "Monitor LTL/TLTL".
+-- Referência: Tabela 2 (A4); fig-automato-a4-tltl-hierarq.
 module Monitor.Automata.A4
   ( M4State (..)
   , M4

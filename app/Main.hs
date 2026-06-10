@@ -8,11 +8,12 @@
 -- * @--quiet@ — formato curto compatível com a Peça 1 ("Output.Plain");
 -- * @--json@  — JSON estruturado ("Output.Json").
 --
--- Códigos de saída:
+-- Códigos de saída (LTL₃):
 --
--- * 0 — traço aceito (⊤);
--- * 1 — erro de parsing/uso ou veredito inconclusivo;
--- * 2 — traço violado (⊥).
+-- * 0 — ⊤ traço aceito;
+-- * 2 — ⊥ traço violado;
+-- * 3 — ? inconclusivo (prefixo sem decisão);
+-- * 1 — erro de parsing/IO/uso.
 module Main (main) where
 
 import qualified Data.Text.IO       as TIO
@@ -21,6 +22,7 @@ import           System.Exit        (ExitCode (..), exitWith)
 import           System.IO          (hPutStrLn, stderr)
 
 import           Monitor.Composed   (runMonitor, runMonitorTrace)
+import           Monitor.Header     (applyParams)
 import           Monitor.MesBridge  (injectMesBridge)
 import           Monitor.Parser     (parseFile)
 import           Monitor.Types      (Verdict (..), defaultConfig)
@@ -71,7 +73,7 @@ processFile mode filepath = do
       hPutStrLn stderr ("Erro ao parsear traço: " ++ err)
       exitWith (ExitFailure 1)
     Right (hdr, events) -> do
-      let cfg     = defaultConfig
+      let cfg     = applyParams hdr defaultConfig
           events' = injectMesBridge cfg hdr events
       case mode of
         ModeQuiet -> do
@@ -90,4 +92,4 @@ processFile mode filepath = do
 exitOn :: Verdict -> IO ()
 exitOn Top          = exitWith ExitSuccess
 exitOn Bot          = exitWith (ExitFailure 2)
-exitOn Inconclusive = exitWith (ExitFailure 1)
+exitOn Inconclusive = exitWith (ExitFailure 3)

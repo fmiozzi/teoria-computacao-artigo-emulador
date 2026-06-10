@@ -19,6 +19,8 @@
 -- estrita demais para o emulador, que deve tolerar cenários históricos
 -- sem heartbeat e ao mesmo tempo capturar agentes "mortos" quando o
 -- traço se propõe a ser monitorado por A6.
+--
+-- Extensão futura (artigo §6) — FORA do monitor composto da v2 (M1⊗M2⊗M3⊗M4).
 module Monitor.Automata.A6
   ( M6State (..)
   , M6

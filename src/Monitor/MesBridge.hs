@@ -21,11 +21,15 @@
 -- classificações com confiança ≥ τ (A5), de forma independente de
 -- A2 — o atraso de uma classificação não a remove de @M_obs@ porque
 -- A2 e o cálculo de divergência são preocupações separadas.
+--
+-- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "MES (apontamento, M_obs/M_dec)".
+-- Referência: §5.4; tab-mapping-monitor-mes.
 module Monitor.MesBridge
   ( injectMesBridge
   ) where
 
 import qualified Monitor.Multiset as MS
+import           Monitor.Classification (isValidCls)
 import           Monitor.Header   (TraceHeader (..))
 import           Monitor.Multiset (Multiset)
 import           Monitor.Types    ( Config (..)
@@ -47,9 +51,9 @@ injectMesBridge cfg mHdr tes =
 
     go _    _   []           = []
     go mDec obs (te : rest) = case teEvent te of
-      ClsPI sku conf
-        | conf >= tau -> te : go mDec (MS.addCls sku obs) rest
-        | otherwise   -> te : go mDec obs rest
+      ClsPI sku _
+        | isValidCls tau (teEvent te) -> te : go mDec (MS.addCls sku obs) rest
+        | otherwise                   -> te : go mDec obs rest
 
       LeaveAbI
         | nextIsPronouncement rest -> te : go mDec obs rest

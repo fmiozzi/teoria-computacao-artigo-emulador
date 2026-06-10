@@ -1,22 +1,26 @@
 ---
-cenario: "Classificação atrasada — gap > T_cls entre rem_i e cls_p_i"
+id: trace_14_viola_a2_classificacao_atrasada
+cenario: "Classificação atrasada — cls válida chega após T_cls do fecho da janela"
 maquina: ROTO-01
 braco: 1
-m_dec: {caixa_2000L: 1}
+parametros: {Tcls: 2000, Tdec: 4000, Tpcp: 5000, tau: 0.85}
 veredito_esperado: BOT
+propriedades_relevantes: [A1, A2, A3]
+referencia_artigo: "Tabela 2 (A2); fig-automato-a2-tltl"
 ---
-# Operador retira a peça em t=1500 ms. A CNN demora 33500 ms para
-# devolver a classificação (cls em t=35000), o que excede T_cls (30000).
-# A2 viola assim que o tempo de qualquer evento ultrapassa o prazo do
-# rem_i pendente — na prática, o próprio evento de cls_p_i atrasado já
-# dispara a transição para o sumidouro.
+# A2 (liveness temporizada): G(leave_ab_i -> F[0,T_cls] cls^>=tau).
+# A peça é retirada e a janela fecha sem classificação válida acumulada.
+# O MES confirma a contagem (match_i dentro de T_dec, satisfaz A3), mas a
+# classificação da CNN só chega em t=5000 — 4000 ms após o leave_ab_i em
+# t=1000, excedendo T_cls=2000. O relógio de A2, ancorado no fecho da
+# janela, expira -> sumidouro (timeout_cls_i) -> viola A2.
 #
-# Demais propriedades: A1 ok (rem dentro da janela), A3 ok (leave +
-# match), A5 ok (conf 0.92 ≥ τ=0.85).
-# Veredito composto: ⊥ pelo ínfimo (A2 puxa para baixo).
+# Demais propriedades: A1 ok (rem dentro da janela); A3 ok (match em
+# t=2000, dentro de T_dec=4000); A4 ok (sem div_i). Veredito composto: BOT
+# pelo ínfimo (A2).
 
-[t=     0] ab_i
-[t=  1500] rem_i
-[t= 35000] cls_p_i caixa_2000L 0.92
-[t= 37000] leave_ab_i
-[t= 37000] match_i
+[t=    0] ab_i
+[t=  500] rem_i
+[t= 1000] leave_ab_i
+[t= 2000] match_i
+[t= 5000] cls_p_i caixa_2000L 0.92
