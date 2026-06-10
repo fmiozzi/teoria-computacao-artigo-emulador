@@ -1,6 +1,7 @@
 ---
 cenario: "Aceitação canônica — uma peça retirada dentro da janela"
 veredito_esperado: TOP
+status_esperado: liberado_integracao
 ---
 # Cenário simples: ab_i, rem_i, classificação, leave_ab_i, match_i.
 # Esperado: ACEITA.

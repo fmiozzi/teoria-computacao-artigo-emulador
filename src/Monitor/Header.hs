@@ -9,7 +9,7 @@
 --   cenario: "Molde vazio esquecido no MES"
 --   maquina: ROTO-01
 --   braco: 1
---   m_dec: {caixa_1000L: 2, caixa_2000L: 1}
+--   m_dec: {caixa_1000L: 2, caixa_500L: 1}
 --   veredito_esperado: TOP
 --   ---
 --   # eventos abaixo
@@ -25,26 +25,34 @@ module Monitor.Header
   ( TraceHeader (..)
   , emptyHeader
   , parseHeader
+  , applyParams
   ) where
 
 import qualified Data.Map.Strict     as Map
 import           Data.Map.Strict     (Map)
 import qualified Data.Text           as T
 import           Monitor.Multiset    (Multiset)
-import           Monitor.Types       (Verdict, parseVerdict)
+import           Monitor.Types       (Config (..), MesStatus, Verdict, parseStatus, parseVerdict)
 
 -- | Campos extraídos do cabeçalho YAML. Todos opcionais — um traço
 -- válido pode dispensar o cabeçalho inteiro.
+--
+-- 'thParams' guarda o flow-map @parametros: {Tcls: .., Tdec: .., Tpcp:
+-- .., tau: ..}@, que sobrepõe os defaults globais por traço (ver
+-- 'Monitor.Types.Config'). Valores são lidos como 'Double' (os prazos em
+-- ms são convertidos para 'Int' por quem consome).
 data TraceHeader = TraceHeader
   { thCenario  :: Maybe T.Text
   , thMaquina  :: Maybe T.Text
   , thBraco    :: Maybe Int
   , thMdec     :: Maybe Multiset
-  , thExpected :: Maybe Verdict
+  , thExpected :: Maybe Verdict        -- ^ @veredito_esperado@: veredito composto (Proposição 2)
+  , thStatus   :: Maybe MesStatus      -- ^ @status_esperado@: status terminal do gate (§5.4)
+  , thParams   :: Maybe (Map T.Text Double)
   } deriving (Eq, Show)
 
 emptyHeader :: TraceHeader
-emptyHeader = TraceHeader Nothing Nothing Nothing Nothing Nothing
+emptyHeader = TraceHeader Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 -- | Parseia o miolo do cabeçalho (sem os marcadores @---@). Linhas
 -- vazias e comentários (@#@) são ignorados; chaves desconhecidas são
@@ -72,7 +80,9 @@ applyEntry h k v = case k of
   "maquina"           -> Right h { thMaquina  = Just (unquote v) }
   "braco"             -> (\n -> h { thBraco = Just n }) <$> readInt (T.unpack v)
   "m_dec"             -> (\m -> h { thMdec  = Just m }) <$> parseFlowMap v
+  "parametros"        -> (\m -> h { thParams = Just m }) <$> parseFlowMapDouble v
   "veredito_esperado" -> (\d -> h { thExpected = Just d }) <$> parseVerdict (T.unpack v)
+  "status_esperado"   -> (\st -> h { thStatus = Just st }) <$> parseStatus (T.unpack (unquote v))
   _                   -> Right h   -- ignora chaves desconhecidas
 
 -- | Remove aspas duplas envolventes (se houver). Strings YAML sem aspas
@@ -111,3 +121,50 @@ parseFlowMap raw = do
                 vStr = T.strip (T.drop 1 rest)
             n <- readInt (T.unpack vStr)
             Right (kStr, n)
+
+-- | Parser de @{Tcls: 2500, Tdec: 2600, tau: 0.80}@ (flow style inline)
+-- com valores 'Double' — usado por @parametros@. Prazos inteiros (ms)
+-- são lidos como 'Double' e convertidos por quem consome.
+parseFlowMapDouble :: T.Text -> Either String (Map T.Text Double)
+parseFlowMapDouble raw = do
+  body <- stripBraces (T.strip raw)
+  let pairs = map T.strip (T.splitOn "," body)
+  entries <- mapM parsePair (filter (not . T.null) pairs)
+  Right (Map.fromList entries)
+  where
+    stripBraces t
+      | T.isPrefixOf "{" t && T.isSuffixOf "}" t =
+          Right (T.drop 1 (T.dropEnd 1 t))
+      | otherwise =
+          Left ("parametros deve estar entre chaves: " ++ T.unpack t)
+
+    parsePair p = case T.breakOn ":" p of
+      (k, rest)
+        | T.null rest -> Left ("entrada sem ':': " ++ T.unpack p)
+        | otherwise   -> do
+            let kStr = T.strip k
+                vStr = T.strip (T.drop 1 rest)
+            d <- readDouble (T.unpack vStr)
+            Right (kStr, d)
+
+readDouble :: String -> Either String Double
+readDouble s = case reads s :: [(Double, String)] of
+  [(d, rest)] | all (== ' ') rest -> Right d
+  _                               -> Left ("número inválido: " ++ s)
+
+-- | Sobrepõe os parâmetros declarados em @parametros: {...}@ do cabeçalho
+-- sobre os defaults globais ('Monitor.Types.Config'). Prazos
+-- (@Tcls@/@Tdec@/@Tpcp@) são lidos em ms e arredondados; @tau@ é usado
+-- como 'Double'. Chaves ausentes mantêm o default. Usado tanto pela CLI
+-- ('Main') quanto pela suíte de testes, garantindo vereditos idênticos.
+applyParams :: Maybe TraceHeader -> Config -> Config
+applyParams mHdr cfg = case mHdr >>= thParams of
+  Nothing -> cfg
+  Just ps -> cfg
+    { cfgTcls = msInt "Tcls" (cfgTcls cfg) ps
+    , cfgTdec = msInt "Tdec" (cfgTdec cfg) ps
+    , cfgTpcp = msInt "Tpcp" (cfgTpcp cfg) ps
+    , cfgTau  = maybe (cfgTau cfg) id (Map.lookup "tau" ps)
+    }
+  where
+    msInt k d ps = maybe d round (Map.lookup k ps)

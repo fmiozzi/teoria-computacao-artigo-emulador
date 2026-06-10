@@ -1,55 +1,66 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Formato de saída plain text (curto), compatível com a Peça 1.
+-- | Formato de saída curto (@--quiet@), 1 bloco por traço — uso em batch.
 --
--- A Fase 7 troca este formato pelo output detalhado tipo "emulador";
--- este módulo continuará disponível atrás da flag @--quiet@.
+-- Reporta o veredito composto (Proposição 2) e a decisão do gate (§5.4):
+-- status terminal do apontamento, diagnóstico de causa-raiz e área de
+-- escalação.
+--
+-- | Bloco arquitetural na figura de arquitetura do artigo: "ERP".
+-- Referência: §5.4 (renderização da decisão do gate).
 module Output.Plain
   ( renderReport
   ) where
 
-import Monitor.Types (Event, Verdict, showEvent, showVerdict)
+import Monitor.Gate   (GateResult (..), Step (..))
+import Monitor.Types  ( MesStatus (..)
+                      , showDiag
+                      , showEvent
+                      , showStatus
+                      , showVerdict
+                      , statusEscala
+                      )
 
--- | Renderiza o relatório de uma execução.
---
--- Quando há violação:
---
--- * Se houve evento ofensor durante o stream, mostra a posição e o
---   evento.
--- * Caso a violação só se manifeste no fim do traço (ex.: A3 em
---   @awaiting@), reporta "no fim do traço".
--- * Em qualquer caso, lista as regras violadas e suas fórmulas.
-renderReport
-  :: FilePath
-  -> Int                  -- ^ número de eventos processados
-  -> Verdict
-  -> Maybe (Int, Event)   -- ^ posição (1-indexada) e evento ofensor
-  -> [String]             -- ^ regras violadas (vazio quando @v ≠ Bot@)
-  -> String
-renderReport filepath n v mViol rules = unlines $
+-- | Renderiza o relatório curto de uma execução.
+renderReport :: FilePath -> GateResult -> String
+renderReport filepath res = unlines $
   [ ""
   , "Arquivo  : " ++ filepath
-  , "Eventos  : " ++ show n
-  , "Veredito : " ++ showVerdict v
-  ] ++ violationLines mViol rules
+  , "Eventos  : " ++ show (length (grSteps res))
+  , "Veredito : " ++ showVerdict (grVerdict res) ++ "   (composto, Proposição 2)"
+  , "Decisão  : " ++ decisionWord (grStatus res) ++ " — " ++ showStatus (grStatus res)
+  ] ++ gateLines res
 
-violationLines :: Maybe (Int, Event) -> [String] -> [String]
-violationLines _        []    = []
-violationLines mViol    rules =
-    locationLine mViol
-  : ("Regra(s) violada(s): " ++ unwords rules)
-  : map describeRule rules
+gateLines :: GateResult -> [String]
+gateLines res = case grStatus res of
+  LiberadoIntegracao  -> ["Escala   : " ++ statusEscala LiberadoIntegracao]
+  PendenteVerificacao -> []
+  status ->
+    [ "Causa    : " ++ maybe "(não diagnosticada)" showDiag (grDiag res)
+    , "Escala   : " ++ statusEscala status
+    , locationLine (grSteps res) (grFirstViol res) (grDivAt res)
+    ] ++ map describeRule (grRules res)
 
-locationLine :: Maybe (Int, Event) -> String
-locationLine (Just (i, e)) = "Violacao no evento #" ++ show i ++ ": " ++ showEvent e
-locationLine Nothing       = "Violacao detectada no fim do traço."
+decisionWord :: MesStatus -> String
+decisionWord LiberadoIntegracao  = "LIBERAR"
+decisionWord PendenteVerificacao = "PENDENTE"
+decisionWord _                   = "BLOQUEAR"
+
+locationLine :: [Step] -> Maybe Int -> Maybe Int -> String
+locationLine steps (Just i) _ =
+  "Local    : violação de stream no evento #" ++ show i ++ atEvent steps i
+locationLine _ Nothing (Just j) =
+  "Local    : div_i materializado no evento #" ++ show j
+locationLine _ Nothing Nothing =
+  "Local    : detectado ao fim do traço"
+
+atEvent :: [Step] -> Int -> String
+atEvent steps i = case [ st | st <- steps, stepIdx st == i ] of
+  (st : _) -> ": " ++ showEvent (stepEvent st)
+  []       -> ""
 
 describeRule :: String -> String
-describeRule "A1" = "  A1: G(rem_i -> ab_i)                       (rem_i fora da janela)"
-describeRule "A2" = "  A2: G(rem_i -> F[0,T_cls] cls_p_i)          (cls atrasada ou ausente)"
-describeRule "A3" = "  A3: G(leave_ab_i -> match_i v div_i)        (fim da janela sem pronunciamento)"
-describeRule "A4" = "  A4: G(div_i -> F[0,T_pcp] esc_pcp_i)        (escalação ao PCP atrasada ou ausente)"
-describeRule "A6" = "  A6: G F[0,T_h] heartbeat                    (agente sem sinal de vida)"
-describeRule "A7" = "  A7: G(rej_i -> cls recente em T_rej)        (rejeição sem classificação prévia)"
-describeRule "A8" = "  A8: G(ab_i -> F[0,T_ab_max] leave_ab_i)     (janela longa demais)"
+describeRule "A1" = "  A1: G(rem_i → ab_i)                          (rem_i fora da janela)"
+describeRule "A2" = "  A2: G((leave_ab_i ∧ houve_rem_i) → F[0,T_cls] cls^≥τ)  (classificação ausente/tardia)"
+describeRule "A3" = "  A3: G(leave_ab_i → F[0,T_dec] (match∨div))   (decisão do mes-bridge ausente/tardia)"
 describeRule r    = "  " ++ r

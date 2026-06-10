@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               lab-monitor
-version:            0.7.0.0
+version:            0.8.0.0
 synopsis:           Monitor LTL/TLTL para verificação em tempo de execução
                     de propriedades operacionais de um agente de visão
                     computacional em manufatura
@@ -19,8 +19,10 @@ library
         Monitor.Types
       , Monitor.Parser
       , Monitor.Header
+      , Monitor.Classification
       , Monitor.Multiset
       , Monitor.MesBridge
+      , Monitor.Gate
       , Monitor.Automata.A1
       , Monitor.Automata.A2
       , Monitor.Automata.A3
@@ -46,6 +48,22 @@ executable lab-monitor
         text,
         lab-monitor
 
+-- | Gerador do corpus aleatório de 400 traços (PBT materializado, §5/§7 do
+-- artigo). Reproduzível por semente fixa; emite os traços + resultados em
+-- Files/Corpus/ e verifica a Proposição 2 (veredito composto = ínfimo) em
+-- cada caso. Uso: `cabal run corpus-gen`.
+executable corpus-gen
+    import:           warnings
+    main-is:          Corpus.hs
+    hs-source-dirs:   app
+    build-depends:
+        base,
+        text,
+        containers,
+        directory,
+        filepath,
+        lab-monitor
+
 test-suite lab-monitor-test
     import:           warnings
     type:             exitcode-stdio-1.0
@@ -55,6 +73,8 @@ test-suite lab-monitor-test
         ExampleTraces
       , CompositionProps
       , AbsorbingProps
+      , UnitProps
+      , GateProps
     build-depends:
         base,
         text,

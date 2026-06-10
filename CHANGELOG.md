@@ -4,7 +4,102 @@ Todas as fases marcam pontos de release internos durante a construção
 incremental do emulador. Datas referem-se ao commit principal de cada fase
 no branch `main`.
 
-## [0.7.0] — 2026-05-23 (Fase 10)
+> **Nota de leitura.** As entradas até a 0.7.0 descrevem o modelo **v2
+> antigo** (M₁⊗M₂⊗M₃⊗M₄, `div_i` com 4 disjuntos, gate binário,
+> `runMonitor`/`injectMesBridge`, T_cls = 30 s). Elas ficam preservadas
+> como histórico, mas **não refletem o estado atual** do código — a
+> entrada [0.8.0] abaixo reescreve a arquitetura para o modelo
+> **normativo v2_3** do artigo. Onde uma entrada antiga afirma algo hoje
+> falso, há uma marca `⚠ obsoleto desde 0.8.0`.
+
+## [0.8.0] — 2026 (alinhamento ao artigo v2_3)
+
+Reescrita do recorte verificado e do efetor para o modelo **normativo
+v2_3** (`Artigo_SBC_Teo_Comp_v2_3.pdf`). Esta entrada consolida as
+correções F1–F10; o código compila e testa (GHC 9.4.8 via Nix), **43
+testes** verdes.
+
+- **F1 — Composição (`Monitor.Composed`).** O monitor verificado passa a
+  ser o produto sincronizado de **TRÊS** componentes, `M = M₁ ⊗ M₂ ⊗ M₃`
+  (A1 safety, A2′ e A3′ bounded liveness). **A4 sai do produto**: a
+  escalada ao PCP é ação determinística do gate, não obrigação verificada.
+  Cota de estados ≤ 2×3×3 = 18; cota binária 2^|Φ| = 8 com |Φ| = 3.
+- **F2 — Efetor de QUATRO status (`Monitor.Gate`).** O gate deixa de ser
+  binário (Liberar | Bloquear). É um efetor (Algoritmo 1, §5.4, Figura 9,
+  Tabelas 3–4) que transita o apontamento de `pendente_verificacao` para
+  um de quatro status terminais por causa-raiz: `liberado_integracao`,
+  `divergencia_pcp`, `erro_classificacao`, `erro_decisao`. Cada bloqueio
+  carrega um diagnóstico (`Diag`: `safety_A1` | `mismatch` | `fora_ciclo`
+  | `timeout_cls` | `leave_ab_silent`). Ordem de prioridade: sumidouro de
+  M₁ → M₂ → M₃ → `div_i` → `match_i`.
+- **F3 — `div_i` com DOIS disjuntos (§3.4).** `div_i := mismatch_i ∨
+  fora_ciclo_i`. A forma antiga de quatro disjuntos (`mismatch ∨
+  timeout_cls ∨ leave_ab_silent ∨ fora_ciclo`) foi removida. `timeout_cls`
+  (sumidouro de M₂) e `leave_ab_silent` (sumidouro de M₃) **não** são
+  `div_i` — são roteados a `erro_classificacao`/`erro_decisao` pelo gate.
+- **F4 — Veredito ≠ status.** O veredito composto (ínfimo no reticulado
+  ⊥ < ? < ⊤, Proposição 2) é independente do status do gate. Um
+  `mismatch` tem veredito composto ⊤ (A1/A2/A3 satisfeitas) mas o gate
+  bloqueia com `divergencia_pcp`, pois `div_i` é decisão de **processo**.
+- **F5 — API do motor.** Ponto de entrada único:
+  `Monitor.Gate.run :: Config -> Maybe Multiset -> [TimedEvent] ->
+  GateResult`. As funções v2 `Monitor.Composed.runMonitor` /
+  `runMonitorTrace` e `Monitor.MesBridge.injectMesBridge` **não existem
+  mais**. `Monitor.Composed` expõe só o produto puro
+  (`step`/`verdict`/`finalVerdict`/`sinkM1`/`sinkM2`/`sinkM3`);
+  `Monitor.MesBridge` expõe `pronounce`/`structuralException` (operações
+  puras), e o enriquecimento do fluxo vive em `Monitor.Gate`.
+- **F6 — Parâmetros (`defaultConfig`).** T_cls = 1500 ms; ε = 200 ms;
+  T_dec = T_cls + ε = 1700 ms; δ_mb = 100 ms (≤ ε); τ = 0.85. Removidos
+  os antigos 30 s / 31 s. T_pcp/T_h/T_rej/T_ab_max ficam em `Config`
+  apenas para os módulos prospectivos. Novo campo `cfgTdec`/`cfgDeltaMb`;
+  **`cfgValidSKUs` foi removido** do `Config`.
+- **F7 — SKUs (`anchorCatalog`).** Catálogo-âncora fechado de 7 SKUs da
+  Figura 12: `caixa_500L`, `caixa_1000L`, `tampa_1000L`,
+  `molde_caixa_500L_vazio`, `molde_caixa_1000L_vazio`,
+  `molde_tampa_500L_vazio`, `molde_tampa_1000L_abastecido`. Removidos
+  `caixa_2000L/3000L/5000L` e `molde_vazio` genérico.
+- **F8 — AP e proposições (§3.2).** `AP = { ab_i, leave_ab_i, match_i,
+  div_i, rem_{i,j}, cls_{p,i,j} }`. `esc_pcp_i`, `heartbeat`, `rej_i`
+  **não** pertencem a AP — `Monitor.Types.isAP` reflete isso.
+- **F9 — Cabeçalho do traço.** O YAML aceita agora `status_esperado`
+  (status terminal do gate, §5.4) além de `veredito_esperado` (veredito
+  composto). A suíte `ExampleTraces` checa ambos.
+- **F10 — Extensões prospectivas (§6).** A4 (escalação ao PCP), A6
+  (heartbeat), A7 (refugo) e A8 (janela máxima) permanecem como
+  protótipos isolados (`Monitor.Automata.A4/A6/A7/A8`), **não importados**
+  pelo monitor composto nem pelo gate. Os cenários que os exercitam saem
+  para `Files/Traces/extras/`.
+- **Renomeações de traços.** `trace_08_viola_a4_molde_vazio` →
+  `trace_08_divergencia_molde_vazio`;
+  `trace_09_viola_a4_op_errada` → `trace_09_divergencia_op_errada`
+  (ambos: veredito composto ⊤, status `divergencia_pcp`/`mismatch`);
+  `trace_13_viola_a4_deriva_cnn` → `trace_13_viola_a2_deriva_cnn`
+  (`erro_classificacao`/`timeout_cls`); novo
+  `trace_16_viola_a3_decisao_atrasada` (`erro_decisao`/`leave_ab_silent`).
+  Os prospectivos `trace_10/11/12/15` migram para `extras/`.
+- **Corpus aleatório (`corpus-gen`).** Novo executável que gera **400
+  traços** com PRNG determinístico (semente fixa, reproduzível) em
+  `Files/Corpus/`: `traces/corpus_001..400.txt`, `resultados.csv`,
+  `RELATORIO.md`. Materializa o PBT da Proposição 2 (confirmada 400/400).
+  Distribuição: 208 ⊤ / 192 ⊥; gate 138 `liberado_integracao` / 70
+  `divergencia_pcp` / 155 `erro_classificacao` / 37 `erro_decisao`.
+- **Testes do efetor (`test/GateProps.hs`).** Nova bateria HUnit que
+  exercita os quatro status terminais e os cinco diagnósticos do gate —
+  incluindo `fora_ciclo` (detector de exceções estruturais do mes-bridge)
+  — e a precedência da decisão (`Gate.decide`). Suíte passa a **43 testes**.
+- **Invariante temporal (`Monitor.Gate`).** O δ_mb efetivo é limitado a
+  `δ_mb ≤ T_dec − T_cls` (§3.4) em runtime, de forma defensiva, mesmo
+  quando o cabeçalho sobrescreve `T_cls`/`T_dec`.
+- **Filtro de AP (`Monitor.Gate.run`).** As proposições prospectivas
+  (`esc_pcp`/`heartbeat`/`rej`) são descartadas via `isAP` antes do
+  produto, garantindo que não avancem relógios do monitor verificado.
+- **Higiene do artefato (DOI).** Removidos `Hello_World/` (tutorial não
+  relacionado, versionado com binário) e `Exec_Git/` (scripts de
+  sincronização pessoal); o CI passa a verificar que o corpus versionado
+  não diverge do gerador (`git diff --exit-code Files/Corpus`).
+
+## [0.7.0] — 2026-05-23 (Fase 10) ⚠ obsoleto desde 0.8.0
 
 Extensões A6, A7, A8 + promoção dos cenários 10/11/12.
 
@@ -39,9 +134,12 @@ Suite de testes automatizados.
 **Pegadinha registrada:** a formulação ingênua "finalVerdict ⊥ é
 absorvente" é falsa — Pending → Idle pode "consertar" o terminal.
 
-## [0.5.0] — 2026-05-23 (Fase 8)
+## [0.5.0] — 2026-05-23 (Fase 8) ⚠ parcialmente obsoleto desde 0.8.0
 
-Cenários 10–13 + renomeação de trace_08/09.
+Cenários 10–13 + renomeação de trace_08/09. (A cadeia "div_i sintético →
+arma A4 → PCP" descrita abaixo foi **removida** na 0.8.0: `trace_08/09`
+hoje têm veredito composto ⊤ e status de gate `divergencia_pcp`;
+`trace_13` foi renomeado para `trace_13_viola_a2_deriva_cnn`.)
 
 - `trace_08`/`trace_09`: removido sufixo `viola_a3` (obsoleto desde Fase 6 —
   agora violam A4 via mes-bridge); comentários internos atualizados.
@@ -66,9 +164,12 @@ Output detalhado tipo "emulador" + flags `--quiet` e `--json`.
 - CLI parsea `--quiet`/`--json`/`--help`.
 - `Exec/monitor.sh` repassa flags; `Exec/batch.sh` usa `--quiet`.
 
-## [0.3.0] — 2026-05-23 (Fase 6)
+## [0.3.0] — 2026-05-23 (Fase 6) ⚠ obsoleto desde 0.8.0
 
-Mes-bridge — injeção automática de `match_i`/`div_i`.
+Mes-bridge — injeção automática de `match_i`/`div_i`. (Na 0.8.0 o
+enriquecimento do fluxo migrou para `Monitor.Gate`; `injectMesBridge` e
+`runMonitor` deixaram de existir, e a injeção de `div_i` não mais "arma
+A4".)
 
 - `Monitor.MesBridge` é um pré-processador entre `parseFile` e
   `runMonitor`. Política (opção C):
@@ -79,9 +180,10 @@ Mes-bridge — injeção automática de `match_i`/`div_i`.
 - Trace 08 e 09 deixam de violar A3 e passam a violar A4 (mes-bridge
   injeta div_i; A4 espera esc_pcp_i que não chega).
 
-## [0.2.5] — 2026-05-23 (Fase 5)
+## [0.2.5] — 2026-05-23 (Fase 5) ⚠ obsoleto desde 0.8.0
 
-A4 (TLTL): `G(div_i → F[0,T_pcp] esc_pcp_i)`.
+A4 (TLTL): `G(div_i → F[0,T_pcp] esc_pcp_i)`. (A4 saiu do produto na
+0.8.0 — virou extensão prospectiva §6, fora do monitor verificado.)
 
 - M4 estruturalmente idêntico a A2 (Idle | Pending | Violated), sem
   filtro de confiança.
@@ -136,5 +238,6 @@ Quebra do `Main.hs` monolítico em módulos coesos.
 ## [0.1.0] — 2026-05-22 (Peça 1)
 
 Versão inicial — A1 (`G(rem_i → ab_i)`) implementada em `Main.hs`
-monolítico. 5 traços de exemplo. Build com Nix/Cabal. Configuração do
-GitHub remoto via `Exec_Git/init.git.sh`/`sync.git.sh`.
+monolítico. 5 traços de exemplo. Build com Nix/Cabal. (Os scripts de
+sincronização com o GitHub usados nesta fase foram removidos do artefato
+na 0.8.0.)

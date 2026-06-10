@@ -17,6 +17,9 @@
 --      índice 0-based do evento)
 --
 -- Comentários iniciam com @#@. Linhas em branco são ignoradas.
+--
+-- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "Câmera + agente de visão (stream)".
+-- Referência: §3.2 (conjunto AP).
 module Monitor.Parser
   ( parseFile
   , parseEvent

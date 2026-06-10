@@ -1,430 +1,272 @@
-# Emulador LTL/TLTL — Monitor de Apontamento de Produção
+# Emulador — Monitor LTL/TLTL para Agentes de Visão em Manufatura
 
-Implementação em Haskell de um monitor de *runtime verification* para 8
-propriedades LTL/TLTL especificadas no artigo
+Implementação em Haskell de um monitor de verificação em tempo de execução
+(*runtime verification*) para as restrições operacionais especificadas no
+artigo. O emulador concretiza, em código executável, a arquitetura de
+referência: um agente de visão computacional observa uma máquina de
+rotomoldagem multi-braço, e cada classificação de produto é submetida a um
+monitor de autômatos que decide, em tempo real, se o apontamento de produção
+pode prosseguir do MES ao ERP.
 
-> Miozzi, F. M. B. (2026). *Verificação de Restrições Operacionais em Agentes
-> de Visão Computacional via Autômatos de Monitoramento: Especificação em LTL
-> e TLTL para Apontamento de Produção em Manufatura.*
+O núcleo verificado é o monitor composto `M = M1 ⊗ M2 ⊗ M3`, produto
+sincronizado de três componentes que formalizam as propriedades A1
+(*safety*), A2 (*liveness* temporizada, relógio `T_cls`) e A3 (*liveness*
+temporizada, relógio `T_dec`), com o filtro estrutural A5 (limiar de
+confiança da CNN, `τ`) aplicado a montante. A numeração salta A4 (nota de
+rodapé 4 do artigo): este é o recorte verificado e avaliado — A1–A3 + A5. O
+veredito do produto é o ínfimo dos vereditos individuais no reticulado de
+três valores `⊥ < ? < ⊤` (Bauer, Leucker e Schallhart, 2011), resultado
+estabelecido pela Proposição 2. Como `⊥` é absorvente em cada componente,
+basta o autômato mais pessimista para determinar o veredito composto. As
+cotas são imediatas: o produto tem no máximo `2×3×3 = 18` estados, contra a
+cota binária `2^|Φ| = 8` com `|Φ| = 3`.
 
-O monitor consome traços de eventos atômicos (gerados, em produção, por um
-agente de visão computacional sobre uma máquina de rotomoldagem multi-braço)
-e decide, em tempo real, se o apontamento de produção deve ser **liberado**
-ou **bloqueado** na integração MES → ERP.
+O monitor consome traços de eventos atômicos com marcação temporal e produz
+um veredito de três valores, traduzido por um *gate* de decisão (Algoritmo 1)
+que transita o apontamento de `pendente_verificacao` a um de quatro status
+terminais por causa-raiz (ver abaixo). As propriedades A4, A6, A7 e A8 são
+extensões **prospectivas** (artigo §6), fora do recorte avaliado: seus
+autômatos (`Monitor.Automata.A4/A6/A7/A8`) permanecem no repositório como
+protótipos isolados, não importados pelo monitor composto.
 
----
+## Mapeamento módulo → bloco da arquitetura
 
-## Sumário
+| Bloco da arquitetura de referência         | Módulo(s)                                  |
+|--------------------------------------------|--------------------------------------------|
+| Máquina de rotomoldagem multi-braço        | `Monitor.Types`                            |
+| Câmera + agente de visão                   | `Monitor.Parser`                           |
+| Pipeline de inferência (CNN) — A5          | `Monitor.Classification` (`filterByTau`)   |
+| MES (apontamento, `M_obs`/`M_dec`)         | `Monitor.Multiset`, `Monitor.MesBridge`    |
+| Monitor LTL/TLTL (ínfimo, Proposição 2)    | `Monitor.Automata.A1`–`A3`, `Monitor.Composed` |
+| Gate MES↔ERP (efetor, Algoritmo 1)         | `Monitor.Gate`                             |
+| ERP (renderização do veredito)             | `Output.Plain`, `Output.Detailed`, `Output.Json` |
+| Ponto de entrada (CLI)                      | `app/Main.hs`                              |
 
-- [Status](#status)
-- [Quick start](#quick-start)
-- [Estrutura de pastas](#estrutura-de-pastas)
-- [Propriedades implementadas](#propriedades-implementadas)
-- [Cenários cobertos](#cenários-cobertos)
-- [Modos de saída do CLI](#modos-de-saída-do-cli)
-- [Formato do arquivo de traço](#formato-do-arquivo-de-traço)
-- [Configuração de parâmetros](#configuração-de-parâmetros)
-- [Como rodar os testes](#como-rodar-os-testes)
-- [Roadmap](#roadmap)
-- [Como contribuir](#como-contribuir)
-- [Citação](#citação)
-- [Licença](#licença)
+Detalhamento do mapeamento em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
----
+## Propriedades do recorte verificado: A1–A3 + A5 (Tabela 2)
 
-## Status
+| ID | Tipo                 | Fórmula                                                | Parâm.  |
+|----|----------------------|--------------------------------------------------------|---------|
+| A1 | safety               | `G(rem_{i,j} → ab_i)`                                   | —       |
+| A2 | liveness temporizada | `G(leave_ab_i → F_{[0,T_cls]} ⋁_{j,p} cls_{p,i,j}^{≥τ})` | `T_cls` |
+| A3 | liveness temporizada | `G(leave_ab_i → F_{[0,T_dec]} (match_i ∨ div_i))`      | `T_dec` |
+| A5 | restrição estrutural | filtro `conf ≥ τ` sobre `cls` antes de `M_obs`         | `τ`     |
 
-| Indicador | Valor |
+`T_dec = T_cls + ε`, com `T_dec ≥ T_cls`. O evento derivado `div_i` (§3.4) é
+definido com **exatamente dois disjuntos**:
+
+```
+div_i := mismatch_i ∨ fora_ciclo_i
+```
+
+- `mismatch_i`: emitido pelo mes-bridge em `τ_b + T_cls + δ_mb` quando
+  `M_obs[τ_a, τ_b + T_cls] ≠ M_dec` (`δ_mb ≤ T_dec − T_cls`);
+- `fora_ciclo_i`: exceções estruturais do ciclo (ex.: `leave_ab` duplicado,
+  pronunciamento espúrio) e a violação de *safety* de A1 (capturada como
+  `fora_ciclo` com diagnóstico `safety_A1`).
+
+`timeout_cls_i` (sumidouro de M2) e `leave_ab_silent_i` (sumidouro de M3)
+**não** são `div_i`: são eventos sintéticos de diagnóstico roteados pelo gate
+a `erro_classificacao` e `erro_decisao`, respectivamente.
+
+A4 — `G(div_i → F_{[0,T_pcp]} esc_pcp_i)` — é extensão prospectiva (§6) e
+**não** faz parte do recorte verificado; `esc_pcp_i`, `heartbeat` e `rej_i`
+não pertencem a AP.
+
+## Monitor composto (ínfimo de M1 ⊗ M2 ⊗ M3)
+
+```
+                     filtro A5 (conf ≥ τ)
+                            │
+            traço ─────────►│ Monitor.Classification
+                            ▼
+              ┌─────────────────────────────────┐
+              │           Monitor.Composed        │
+              │                                   │
+              │      ┌────┐   ┌────┐   ┌────┐     │
+              │      │ M1 │   │ M2 │   │ M3 │     │
+              │      │ A1 │   │ A2 │   │ A3 │     │
+              │      └─┬──┘   └─┬──┘   └─┬──┘     │
+              │        │        │        │        │
+              │        └────────┼────────┘        │
+              │                 ▼                 │
+              │      veredito = ínfimo (⊥<?<⊤)    │
+              │           (Proposição 2)          │
+              └─────────────────┬─────────────────┘
+                                ▼
+                       Monitor.Gate (Alg. 1)
+                                │
+          ┌──────────────┬──────┴──────┬──────────────┐
+          ▼              ▼             ▼              ▼
+   liberado_       divergencia_   erro_          erro_
+   integracao      pcp            classificacao  decisao
+   (MES→ERP)       (→ PCP)        (→ visão)      (→ TI)
+```
+
+O *gate* não é binário: o efetor roteia o apontamento para um de quatro
+status terminais por causa-raiz, na ordem de prioridade do Algoritmo 1
+(`sinkM1 → sinkM2 → sinkM3 → div → match`):
+
+| Status                | Disparo                                              | Diagnóstico                      | Escala para |
+|-----------------------|------------------------------------------------------|----------------------------------|-------------|
+| `liberado_integracao` | `match_i` dentro de `T_dec`, sem violação            | —                                | integração nativa MES→ERP |
+| `divergencia_pcp`     | `div_i` (`mismatch ∨ fora_ciclo`) ou *safety* de A1  | `mismatch` \| `fora_ciclo` \| `safety_A1` | PCP (tratativa manual) |
+| `erro_classificacao`  | sumidouro de M2 (classificação ausente em `T_cls`)   | `timeout_cls`                    | time de visão computacional |
+| `erro_decisao`        | sumidouro de M3 (mes-bridge mudo em `T_dec`)         | `leave_ab_silent`                | TI |
+
+**Distinção essencial: veredito composto ≠ status do gate.** Um `mismatch`
+tem veredito composto `⊤` (A1/A2/A3 satisfeitas — a decisão foi tomada no
+prazo) mas o gate **bloqueia** com `divergencia_pcp`, pois `div_i` é uma
+decisão de **processo**, não uma violação de propriedade. O motor é
+`Monitor.Gate.run :: Config -> Maybe Multiset -> [TimedEvent] -> GateResult`.
+
+## Parâmetros e catálogo de SKUs
+
+Defaults do cenário-âncora do artigo (§4), em `Monitor.Types.defaultConfig`:
+
+| Parâmetro | Valor    | Significado                                          |
+|-----------|----------|------------------------------------------------------|
+| `T_cls`   | 1500 ms  | latência máxima de classificação (A2)               |
+| `ε`       | 200 ms   | folga de decisão                                     |
+| `T_dec`   | 1700 ms  | prazo de decisão do mes-bridge; `T_dec = T_cls + ε` |
+| `δ_mb`    | 100 ms   | latência de comparação do mes-bridge; `δ_mb ≤ ε`    |
+| `τ`       | 0.85     | limiar de confiança da CNN (A5)                      |
+
+`T_pcp` (A4) não é fixado pelo artigo: é prospectivo/ilustrativo, fora do
+recorte verificado. Os parâmetros podem ser sobrescritos pelo cabeçalho do
+traço.
+
+O catálogo-âncora é **fechado** com 7 SKUs (Figura 12 do artigo,
+`Monitor.Types.anchorCatalog`), classificados por um MobileNetV3-Small:
+`caixa_500L`, `caixa_1000L`, `tampa_1000L`, `molde_caixa_500L_vazio`,
+`molde_caixa_1000L_vazio`, `molde_tampa_500L_vazio` e
+`molde_tampa_1000L_abastecido`.
+
+## Build e execução
+
+Toolchain: GHC 9.4.8 e Cabal 3.10, provisionados de forma reproduzível pelo
+Nix (flakes). Não há dependências de sistema fora do Nix.
+
+```bash
+# Compilar
+nix develop --command cabal build
+
+# Suíte de testes (verifica os 12 traços canônicos + composição + absorção)
+nix develop --command cabal test
+
+# Rodar todos os traços canônicos em modo curto
+./Exec/batch.sh Files/Traces
+
+# Rodar um traço específico
+./Exec/monitor.sh Files/Traces/trace_08_divergencia_molde_vazio.txt
+./Exec/monitor.sh --quiet Files/Traces/trace_08_divergencia_molde_vazio.txt
+./Exec/monitor.sh --json  Files/Traces/trace_08_divergencia_molde_vazio.txt
+```
+
+> Nota (Nix flakes): o Nix só enxerga arquivos rastreados pelo Git. Em um
+> repositório novo, rode `git add -N Emulador/` (intent-to-add) antes de
+> `nix develop`.
+
+### Modos da CLI
+
+A interface é `lab-monitor [--quiet|--json] <arquivo_de_traço>`.
+
+| Modo      | Saída |
 |-----------|-------|
-| Versão | `0.7.0` |
-| Propriedades implementadas | A1, A2, A3, A4, A5 (core do artigo) + A6, A7, A8 (extensões) |
-| Cenários cobertos | 15 (todos do `Cenarios_Realistas_Rotomoldagem.md`) |
-| Suite de testes | 20/20 passando — 16 traces + 2 properties Prop. 2 + 2 absorção |
-| Build | `cabal build` limpo com `-Wall -Wincomplete-patterns -Wincomplete-uni-patterns` |
+| (padrão)  | Relatório detalhado: parâmetros, eventos, vereditos por propriedade e gate. |
+| `--quiet` | Bloco curto com o veredito e as regras violadas (usado por `batch.sh`). |
+| `--json`  | JSON estruturado: cabeçalho, configuração, passos, veredito e regras. |
 
-Roteiro detalhado em [docs/CENARIOS.md](docs/CENARIOS.md) e
-[CHANGELOG.md](CHANGELOG.md).
+### Códigos de saída
 
----
+Derivados do **status do gate** (§5.4), não do veredito composto:
 
-## Quick start
+| Código | Status do gate                                                      |
+|--------|--------------------------------------------------------------------|
+| 0      | `liberado_integracao` (LIBERAR)                                    |
+| 2      | BLOQUEAR (`divergencia_pcp` \| `erro_classificacao` \| `erro_decisao`) |
+| 3      | `pendente_verificacao` (sem decisão terminal)                     |
+| 1      | erro de parsing/IO/uso                                             |
 
-**Pré-requisitos** — somente o Nix com flakes habilitado. Toda a toolchain
-(GHC 9.4.8, Cabal 3.10, HLS, bibliotecas Haskell) é provisionada
-automaticamente.
+## Cenários canônicos
 
-```bash
-# 1) Entra no ambiente reproduzível (Nix devShell)
-nix develop
+A suíte canônica reúne **12 traços** do recorte verificado (A1–A3 + A5) em
+`Files/Traces/`, todos com `veredito_esperado` (veredito composto) e
+`status_esperado` (status terminal do gate) no cabeçalho YAML e verificados
+por `cabal test`. Note que veredito e status são dimensões independentes: o
+`mismatch` dos traços 08/09 tem veredito `⊤`, mas o gate bloqueia em
+`divergencia_pcp`.
 
-# 2) Compila
-cabal build
+| Traço | Cenário                          | Veredito | Status do gate (diag)               |
+|-------|----------------------------------|----------|-------------------------------------|
+| 01    | aceita simples                   | `⊤`      | `liberado_integracao`               |
+| 02    | aceita múltiplas                 | `⊤`      | `liberado_integracao`               |
+| 05    | aceita vazio (janela vacuosa)    | `⊤`      | `liberado_integracao`               |
+| 06    | aceita braço 1 (mix)             | `⊤`      | `liberado_integracao`               |
+| 07    | aceita braço 2 (uniforme)        | `⊤`      | `liberado_integracao`               |
+| 03    | viola A1 (retirada no início)    | `⊥`      | `divergencia_pcp` (`safety_A1`)     |
+| 04    | viola A1 (retirada após leave)   | `⊥`      | `divergencia_pcp` (`safety_A1`)     |
+| 08    | divergência: molde vazio no MES  | `⊤`      | `divergencia_pcp` (`mismatch`)      |
+| 09    | divergência: OP errada           | `⊤`      | `divergencia_pcp` (`mismatch`)      |
+| 13    | deriva da CNN (A5 → A2)          | `⊥`      | `erro_classificacao` (`timeout_cls`)|
+| 14    | classificação atrasada (A2)      | `⊥`      | `erro_classificacao`                |
+| 16    | decisão atrasada (A3)            | `⊥`      | `erro_decisao` (`leave_ab_silent`)  |
 
-# 3) Roda todos os traços (formato curto)
-./Exec/batch.sh
+Os cenários que exercitam as extensões **prospectivas** (artigo §6), **fora
+do recorte verificado**, ficam em `Files/Traces/extras/`: `trace_10` (A7,
+refugo), `trace_11` (A8, janela longa), `trace_12` (A6, agente morto) e
+`trace_15` (A4, escalação atrasada).
 
-# 4) Roda um traço com output detalhado tipo "emulador"
-./Exec/monitor.sh Files/Traces/trace_08_viola_a4_molde_vazio.txt
+Esses números são as métricas reais do emulador. O artigo cita "15 cenários"
+como métrica narrativa; o repositório materializa 12 cenários canônicos
+curados (recorte A1–A3 + A5), mais 4 traços prospectivos em `extras/` (§6), e
+ainda o corpus de 400 traços aleatórios descrito abaixo. Análise detalhada em
+[docs/CENARIOS.md](docs/CENARIOS.md); decisões de projeto em
+[docs/DECISOES.md](docs/DECISOES.md); formato de traço em
+[docs/FORMATO_TRACE.md](docs/FORMATO_TRACE.md); arquitetura em
+[docs/ARQUITETURA.md](docs/ARQUITETURA.md); referências em
+[docs/REFERENCIAS.md](docs/REFERENCIAS.md). Para depurar via GHCi, ver
+[debug.md](debug.md).
 
-# 5) JSON estruturado
-./Exec/monitor.sh --json Files/Traces/trace_08_viola_a4_molde_vazio.txt
-```
+## Corpus aleatório (Proposição 2 — PBT materializado)
 
-> **Atenção (Nix flakes):** o Nix só enxerga arquivos rastreados pelo Git.
-> Se acabou de clonar, isso já está resolvido. Se está adicionando
-> `Emulador/` a um repositório novo, antes de rodar `nix develop`:
->
-> ```bash
-> git add -N Emulador/   # intent-to-add (não stage o conteúdo)
-> ```
-
-**Códigos de saída** do executável `lab-monitor`:
-
-| Código | Significado |
-|--------|-------------|
-| 0 | Traço aceito (⊤) |
-| 1 | Erro de parsing/uso, ou veredito inconclusivo |
-| 2 | Traço violado (⊥) |
-
----
-
-## Estrutura de pastas
-
-```
-Emulador/
-├── app/
-│   └── Main.hs                       # CLI (argumentos, dispatch de modo)
-├── src/
-│   ├── Monitor/
-│   │   ├── Types.hs                  # Event, Verdict, TimedEvent, Config
-│   │   ├── Parser.hs                 # Cabeçalho YAML + timestamps
-│   │   ├── Header.hs                 # Parser ad-hoc do header
-│   │   ├── Multiset.hs               # M_obs, M_dec, compareMs
-│   │   ├── MesBridge.hs              # Injeção de match/div pós leave_ab_i
-│   │   ├── Automata/
-│   │   │   ├── A1.hs                 # safety: G(rem→ab)
-│   │   │   ├── A2.hs                 # TLTL : G(rem→F[T_cls] cls)
-│   │   │   ├── A3.hs                 # safety: G(leave→match∨div)
-│   │   │   ├── A4.hs                 # TLTL : G(div→F[T_pcp] esc_pcp)
-│   │   │   ├── A6.hs                 # TLTL : G F[T_h] heartbeat
-│   │   │   ├── A7.hs                 # safety: G(rej→cls recente)
-│   │   │   └── A8.hs                 # TLTL : G(ab→F[T_ab_max] leave)
-│   │   └── Composed.hs               # Produto sincronizado (Prop. 2)
-│   └── Output/
-│       ├── Plain.hs                  # Formato curto (--quiet)
-│       ├── Detailed.hs               # Formato detalhado (default)
-│       └── Json.hs                   # JSON estruturado (--json)
-├── test/
-│   ├── Spec.hs                       # Entry point Tasty
-│   ├── ExampleTraces.hs              # 1 caso por traço em Files/
-│   ├── CompositionProps.hs           # Proposição 2 via QuickCheck
-│   └── AbsorbingProps.hs             # Sumidouro Violated é absorvente
-├── Files/
-│   ├── Traces/                       # 15 cenários (trace_01 a trace_15)
-│   └── Smoke/                        # Testes do parser (cabeçalho + timestamps)
-├── Exec/
-│   ├── monitor.sh                    # Roda um traço (com flags)
-│   └── batch.sh                      # Roda todos os traços de Files/Traces/
-├── Exec_Git/
-│   ├── init.git.sh                   # Inicializa o repo Git remoto
-│   └── sync.git.sh                   # Sincroniza commits com o remoto
-├── docs/
-│   ├── ARQUITETURA.md                # Diagrama do monitor composto
-│   ├── CENARIOS.md                   # Tabela detalhada dos 15 cenários
-│   └── REFERENCIAS.md                # Bibliografia
-├── CHANGELOG.md
-├── README.md
-├── LICENSE
-├── flake.nix                         # Ambiente Nix
-└── lab-monitor.cabal                 # library + executable + test-suite
-```
-
----
-
-## Propriedades implementadas
-
-| ID | Tipo | Fórmula | Default | Captura |
-|----|------|---------|---------|---------|
-| **A1** | safety LTL | $G(rem_i \to ab_i)$ | — | Retirada fora da janela de abastecimento |
-| **A2** | TLTL | $G(rem_i \to F_{[0,T_{cls}]} \bigvee_p cls_{p,i})$ | $T_{cls}=30\text{s}$ | Classificação atrasada ou ausente |
-| **A3** | safety LTL | $G(leave\_ab_i \to match_i \vee div_i)$ | — | Fim da janela sem pronunciamento |
-| **A4** | TLTL | $G(div_i \to F_{[0,T_{pcp}]} esc\_pcp_i)$ | $T_{pcp}=5\text{min}$ | Escalação ao PCP atrasada |
-| **A5** | filtro | $cls_{p,i}$ contribui para $M_{obs}$ se $\text{conf} \geq \tau$ | $\tau=0{,}85$ | Filtro de confiança da CNN |
-| **A6** | TLTL ext. | $G F_{[0,T_h]} heartbeat_i$ | $T_h=5\text{s}$ | Agente "morto" ou "cego" |
-| **A7** | safety ext. | $G(rej_i \to \exists\,recent\,cls_{p,i})$ | $T_{rej}=10\text{s}$ | Refugo sem classificação prévia |
-| **A8** | TLTL ext. | $G(ab_i \to F_{[0,T_{ab\_max}]} leave\_ab_i)$ | $T_{ab\_max}=15\text{min}$ | Janela aberta tempo demais |
-
-**Composição** (Proposição 2 do artigo): o veredito do monitor composto
-$M = M_1 \otimes M_2 \otimes \cdots \otimes M_8$ é o **ínfimo** dos
-vereditos individuais no reticulado $\bot < \text{?} < \top$. Implementação em
-[`src/Monitor/Composed.hs`](src/Monitor/Composed.hs).
-
-**A5 embutido em A2.** Não há autômato $M_5$ separado: o limiar $\tau$
-filtra as classificações que resolvem A2 e que contribuem para $M_{obs}$.
-É decisão de modelagem deliberada — A5 não é uma propriedade temporal.
-
-**Mes-bridge** (§5.4 do artigo, [`src/Monitor/MesBridge.hs`](src/Monitor/MesBridge.hs)):
-ao chegar em `leave_ab_i`, se o traço não pronunciar `match_i`/`div_i`, o
-emulador compara `M_obs` (acumulado) com `M_dec` (do cabeçalho YAML) e
-injeta automaticamente o evento ausente — simulando o componente externo
-que existe em produção.
-
-Tabela cenário×propriedade em [docs/CENARIOS.md](docs/CENARIOS.md).
-
----
-
-## Cenários cobertos
-
-Os 15 cenários derivam da análise operacional de rotomoldagem multi-braço.
-Cada um vira ao menos um arquivo em `Files/Traces/`.
-
-| # | Cenário | Veredito | Propriedade que captura |
-|---|---------|---------:|-------------------------|
-| 01 | Aceitação canônica (1 peça) | ⊤ | — |
-| 02 | Aceitação múltiplas peças | ⊤ | — |
-| 03 | rem_i antes de ab_i | ⊥ | A1 |
-| 04 | rem_i após leave_ab_i | ⊥ | A1 (+ A3) |
-| 05 | Janela vazia | ⊤ | — |
-| 06 | Braço 1 mix OP A+B+vazio | ⊤ | — |
-| 07 | Braço 2 OP C uniforme | ⊤ | — |
-| 08 | Molde vazio esquecido no MES | ⊥ | A4 (após mes-bridge) |
-| 09 | OP errada no PLC | ⊥ | A4 (após mes-bridge) |
-| 10 | Refugo sem cls prévia | ⊥ | A7 |
-| 11 | Janela longa demais (34 min) | ⊥ | A8 |
-| 12 | Agente morto (gap > T_h) | ⊥ | A6 |
-| 13 | Deriva da CNN (todas conf<τ) | ⊥ | A2 + A4 |
-| 14 | Classificação atrasada (gap > T_cls) | ⊥ | A2 |
-| 15 | Escalação atrasada (gap > T_pcp) | ⊥ | A4 |
-
-Análise por cenário em [docs/CENARIOS.md](docs/CENARIOS.md).
-
----
-
-## Modos de saída do CLI
+Além dos cenários curados, o repositório inclui um corpus de **400 traços
+aleatórios** em `Files/Corpus/`, gerado de forma determinística (PRNG com
+semente fixa, reproduzível):
 
 ```bash
-lab-monitor [--quiet|--json] <arquivo_de_traço>
+# Regenera Files/Corpus/ de forma idêntica (traces/, resultados.csv, RELATORIO.md)
+nix develop --command cabal run corpus-gen
 ```
 
-| Modo | Quando usar |
-|------|-------------|
-| (padrão) | Formato detalhado tipo "emulador" — parâmetros, processamento evento-a-evento, vereditos por propriedade, decisão do gate. Auditável. |
-| `--quiet` | Bloco curto (~5 linhas) com veredito e regras violadas. Usado pelo `batch.sh`. |
-| `--json` | JSON estruturado: header, config, todos os steps com estado, veredito final, índice da primeira violação, regras violadas. |
+O corpus materializa o *property-based testing* da Proposição 2 (veredito
+composto = ínfimo de M1 ⊗ M2 ⊗ M3), **confirmada em 400/400** casos. A
+distribuição registrada em `Files/Corpus/RELATORIO.md`: 208 `⊤` / 192 `⊥` por
+veredito composto; 138 `liberado_integracao` / 70 `divergencia_pcp` / 155
+`erro_classificacao` / 37 `erro_decisao` por status do gate. Cada traço é
+re-executável pelo CLI (`lab-monitor Files/Corpus/traces/corpus_001.txt`).
 
-### Exemplo — formato detalhado (default)
-
-```
-===================================================================
-EMULADOR LTL/TLTL — Monitor de Apontamento de Produção
-Versão 0.7.0 — A1, A2, A3, A4, A5 + extensões A6, A7, A8
-===================================================================
-
-Arquivo : Files/Traces/trace_08_viola_a4_molde_vazio.txt
-Cenário : Molde vazio esquecido no MES (Situação 2 do artigo)
-Máquina : ROTO-01
-Braço   : 1
-
-Parâmetros do monitor:
-  T_cls    = 30000 ms     (A2)
-  T_pcp    = 300000 ms    (A4)
-  T_h      = 5000 ms      (A6)
-  T_rej    = 10000 ms     (A7)
-  T_ab_max = 900000 ms    (A8)
-  τ        = 0.85         (A5)
-
-M_dec declarado no MES: {caixa_1000L:2, caixa_2000L:2}
-
--------------------------------------------------------------------
-Processamento evento-a-evento:
-[t=0       ms]  ab_i              | M1:ok(ab) M2:idle ...  V=⊤
-[t=1500    ms]  rem_i             | M2:pending(x=1500) ... V=⊤
-...
-[t=8000    ms]  div_i             | M3:ok M4:pending(x=8000) V=⊤
-
--------------------------------------------------------------------
-Vereditos por propriedade:
-  A1 (safety: rem → ab)              : ⊤  ✓
-  A2 (TLTL: cls em T_cls)            : ⊤  ✓
-  A3 (safety: leave → match ∨ div)   : ⊤  ✓
-  A4 (TLTL: esc em T_pcp)            : ⊥  ✗ ← violação
-  ...
-
-VEREDITO COMPOSTO (Proposição 2: ínfimo): VIOLA  (F)
-
--------------------------------------------------------------------
-Decisão do gate (§5.4 do artigo):
-  Decisão  : BLOQUEAR integração MES → ERP
-  Motivo   : propriedade A4 violada
-  Local    : detectado no fim do traço
-
-===================================================================
-Resultado: VIOLA  (F)
-Código de saída: 2
-===================================================================
-```
-
----
-
-## Formato do arquivo de traço
-
-Texto simples, **um evento por linha**. Comentários (`#`) e linhas vazias são
-ignorados. Cabeçalho YAML opcional entre `---` no topo. Timestamps opcionais
-por evento.
-
-```yaml
----
-cenario: "Molde vazio esquecido no MES"
-maquina: ROTO-01
-braco: 1
-m_dec: {caixa_1000L: 2, caixa_2000L: 2}
-veredito_esperado: BOT
----
-# Comentários livres
-[t=    0] ab_i
-[t= 1500] rem_i
-[t= 2000] cls_p_i caixa_1000L 0.93
-[t= 8000] leave_ab_i
-```
-
-### Sintaxes de timestamp aceitas
-
-| Forma | Exemplo |
-|-------|---------|
-| Bracketed | `[t=1500] rem_i` |
-| Inteiro inicial | `1500 rem_i` |
-| Ausente (idx × 1000 ms) | `rem_i` |
-
-### Eventos suportados
-
-| Sintaxe | Significado |
-|---------|-------------|
-| `ab_i` | Braço entrou na janela de abastecimento |
-| `rem_i` | Peça retirada |
-| `leave_ab_i` | Fim da janela |
-| `match_i` | $M_{obs} = M_{dec}$ |
-| `div_i` | $M_{obs} \neq M_{dec}$ |
-| `esc_pcp_i` | Escalação ao PCP |
-| `heartbeat` | Sinal de vida do agente (A6) |
-| `rej_i` | Peça marcada como refugo (A7) |
-| `cls_p_i <sku> <conf>` | Classificação (ex.: `cls_p_i caixa_1000L 0.93`) |
-
-### Campos do cabeçalho YAML
-
-| Campo | Tipo | Uso |
-|-------|------|-----|
-| `cenario` | string | Exibido no output detalhado |
-| `maquina` | string | Idem |
-| `braco` | int | Idem |
-| `m_dec` | mapa `{sku: int, ...}` flow style | Comparação multiset → injeção match/div |
-| `veredito_esperado` | `TOP\|BOT\|INCONCLUSIVE` (case-insensitive) | Usado pela suite de testes |
-
-Chaves não reconhecidas são silenciosamente ignoradas — extensibilidade
-sem quebra.
-
----
-
-## Configuração de parâmetros
-
-Defaults em `Monitor.Types.defaultConfig`:
-
-```haskell
-defaultConfig = Config
-  { cfgTcls   = 30000      -- 30 s     (A2)
-  , cfgTpcp   = 300000     -- 5 min    (A4)
-  , cfgTh     = 5000       -- 5 s      (A6)
-  , cfgTrej   = 10000      -- 10 s     (A7)
-  , cfgTabMax = 900000     -- 15 min   (A8)
-  , cfgTau    = 0.85       -- limiar de A5
-  , cfgValidSKUs = ["caixa_500L", "caixa_1000L", "caixa_2000L",
-                   "caixa_3000L", "caixa_5000L", "molde_vazio"]
-  }
-```
-
-> **Override via CLI ainda não implementado** (flags `--t-cls`, `--tau` etc.).
-> Está no roadmap — atualmente, alterações exigem edição de
-> `src/Monitor/Types.hs`.
-
----
-
-## Como rodar os testes
-
-```bash
-nix develop --command cabal test --test-show-details=streaming
-```
-
-Saída esperada (resumida):
-
-```
-ExampleTraces       16 OK   (15 em Files/Traces + 1 em Files/Smoke)
-CompositionProps     2 OK   (200 runs cada — Proposição 2)
-AbsorbingProps       2 OK   (200 runs cada — sumidouro)
-All 20 tests passed
-```
-
-Detalhes da suite em [test/](test/).
-
----
-
-## Roadmap
-
-Implementado nas Fases 1–11 (commits `1ec36d6..481238f`):
-
-- [x] Modularização e tipos
-- [x] Cabeçalho YAML + timestamps
-- [x] A1 / A2 / A3 / A4 + composição (Prop. 2)
-- [x] Mes-bridge (injeção automática match/div)
-- [x] Output detalhado, `--quiet`, `--json`
-- [x] A6 (heartbeat), A7 (refugo), A8 (janela limitada)
-- [x] Suite Tasty (HUnit + QuickCheck)
-- [x] Documentação
-
-Próximos passos (não cobertos):
-
-- [ ] Flags CLI para sobrescrever parâmetros (`--t-cls`, `--tau` etc.)
-- [ ] Input via stream (stdin/socket) para integração ao agente real
-- [ ] Multi-braço: `Map ArmId MonitorState` para instâncias independentes
-- [ ] Métrica observacional de "deriva da CNN" (taxa de cls com conf < τ)
-- [ ] CI no GitHub Actions
-
----
-
-## Como contribuir
-
-1. Crie um branch a partir de `main`.
-2. Implemente a mudança mantendo `cabal build` limpo (`-Wall`) e
-   `cabal test` verde.
-3. Para novos cenários, adicione um traço em `Files/Traces/` com
-   cabeçalho YAML completo (especialmente `veredito_esperado`) — a suite
-   de testes pega automaticamente.
-4. Para novas propriedades, siga o padrão dos módulos `Monitor/Automata/A*.hs`
-   (mesmo formato de `step`/`verdict`/`finalVerdict`/`summary`). Adicione
-   ao produto em `Monitor.Composed`.
-5. Abra um PR descrevendo o cenário operacional motivador.
-
----
-
-## Citação
+## Como citar
 
 ```bibtex
 @mastersthesis{miozzi2026monitor,
-  author  = {Miozzi, Fl{\'a}vio M. Batista},
+  author  = {Batista, Fl{\'a}vio Miozzi},
   title   = {Verifica{\c c}{\~a}o de Restri{\c c}{\~o}es Operacionais em
              Agentes de Vis{\~a}o Computacional via Aut{\^o}matos de
-             Monitoramento: Especifica{\c c}{\~a}o em LTL e TLTL para
-             Apontamento de Produ{\c c}{\~a}o em Manufatura},
-  school  = {Universidade [...]},
+             Monitoramento},
+  school  = {Programa de P{\'o}s-Gradua{\c c}{\~a}o em Computa{\c c}{\~a}o
+             Aplicada (PPComp), Instituto Federal do Esp{\'i}rito Santo (Ifes)},
   year    = {2026},
-  note    = {C{\'o}digo-fonte do emulador:
-             \url{https://github.com/fmiozzi/teoria-computacao-artigo-emulador}}
+  doi     = {TODO: preencher com o DOI assim que emitido},
+  url     = {TODO: URL do registro com DOI}
 }
 ```
 
-Bibliografia complementar em [docs/REFERENCIAS.md](docs/REFERENCIAS.md).
-
----
+> O artefato de software (este emulador) recebe um DOI próprio no
+> depósito (Zenodo/figshare); atualize os campos `doi`/`url` acima quando
+> emitido.
 
 ## Licença
 
-MIT — veja [LICENSE](LICENSE). Software acadêmico de demonstração; uso e
-modificação livres, sem garantias.
+Licenciado sob a **Licença MIT** — ver [LICENSE](LICENSE).

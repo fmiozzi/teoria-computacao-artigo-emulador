@@ -1,0 +1,16 @@
+---
+cenario: "Corpus aleatório — caso 135 (semente 25214903917)"
+m_dec: {tampa_1000L: 1}
+veredito_esperado: TOP
+status_esperado: liberado_integracao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=   827] rem_i
+[t=  1207] cls_p_i tampa_1000L 0.514283
+[t=  2083] rem_i
+[t=  2517] cls_p_i caixa_500L 0.729148
+[t=  4031] rem_i
+[t=  4358] cls_p_i tampa_1000L 0.9291940000000001
+[t=  4901] leave_ab_i

@@ -1,0 +1,33 @@
+---
+cenario: "Escalação atrasada (A4 prospectiva) — gap > T_pcp entre div_i e esc_pcp_i"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_500L: 2}
+veredito_esperado: TOP
+status_esperado: divergencia_pcp
+---
+# EXTENSÃO PROSPECTIVA (§6) — A4 NÃO integra o produto verificado
+# M = M1 ⊗ M2 ⊗ M3. Este traço é mantido fora do recorte avaliado.
+#
+# O agente detecta corretamente divergência ao final da janela
+# (M_obs = {caixa_500L:1} ≠ M_dec = {caixa_500L:2}, faltando 1 peça) e
+# emite div_i em t=4500 ms. PORÉM, a escalação ao PCP só chega em
+# t=305000 ms — gap de 300500 ms, acima do T_pcp ilustrativo (300000 ms
+# = 5 min; o artigo não fixa T_pcp).
+#
+# Sob o RECORTE VERIFICADO (A1–A3 + A5): A1 ok (rem dentro da janela);
+# A2 ok (cls em T_cls); A3 ok (div_i pronunciado em prazo após leave);
+# A5 ok (conf 0.92 ≥ τ). Veredito composto = ⊤; o gate roteia o
+# apontamento a divergencia_pcp (div_i materializado). O esc_pcp_i é
+# proposição fora de AP (ignorada pelo monitor verificado).
+#
+# A violação da escalação tardia só é observável no autômato ISOLADO de
+# A4 (Monitor.Automata.A4), cujo sumidouro M4 é atingido pelo esc_pcp_i
+# tardio — fora do produto sincronizado.
+
+[t=      0] ab_i
+[t=   2000] rem_i
+[t=   2500] cls_p_i caixa_500L 0.92
+[t=   4500] leave_ab_i
+[t=   4500] div_i
+[t= 305000] esc_pcp_i

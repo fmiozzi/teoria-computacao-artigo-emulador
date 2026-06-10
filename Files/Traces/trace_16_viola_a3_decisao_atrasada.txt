@@ -1,0 +1,26 @@
+---
+id: trace_16_viola_a3_decisao_atrasada
+cenario: "Decisão atrasada — mes-bridge pronuncia match/div após T_dec"
+maquina: ROTO-01
+braco: 1
+parametros: {Tcls: 5000, Tdec: 2000, Tpcp: 5000, tau: 0.85}
+veredito_esperado: BOT
+status_esperado: erro_decisao
+propriedades_relevantes: [A1, A2, A3]
+referencia_artigo: "Tabela 2 (A3); fig-automato-a3-tltl"
+---
+# A3 (liveness temporizada): G(leave_ab_i -> F[0,T_dec] (match_i v div_i)).
+# A peça é retirada e classificada dentro da janela (A2 satisfeita). A
+# janela fecha em t=2000, mas o mes-bridge só emite o pronunciamento
+# (match_i) em t=5000 — 3000 ms depois, excedendo T_dec=2000. O relógio
+# de A3 expira -> sumidouro (leave_ab_silent) -> viola A3.
+#
+# Demais propriedades: A1 ok; A2 ok (cls 0.92 >= tau durante a janela).
+# Veredito composto: BOT pelo ínfimo (A3). O gate roteia o apontamento a
+# erro_decisao (diag leave_ab_silent): mes-bridge mudo em T_dec → TI.
+
+[t=    0] ab_i
+[t=  500] rem_i
+[t= 1000] cls_p_i caixa_500L 0.92
+[t= 2000] leave_ab_i
+[t= 5000] match_i

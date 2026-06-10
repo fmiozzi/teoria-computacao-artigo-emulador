@@ -1,0 +1,12 @@
+---
+cenario: "Corpus aleatório — caso 080 (semente 25214903917)"
+veredito_esperado: BOT
+status_esperado: erro_classificacao
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=   724] rem_i
+[t=   959] cls_p_i molde_tampa_1000L_abastecido 0.78528
+[t=  2525] leave_ab_i
+[t=  4725] match_i

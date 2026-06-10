@@ -9,6 +9,9 @@
 --
 -- A Peça 1 ainda não consome este módulo; ele é usado a partir da
 -- Fase 6 (composição com M_dec lido do cabeçalho YAML).
+--
+-- | Bloco arquitetural na figura de arquitetura (v2) do artigo: "MES (apontamento, M_obs/M_dec)".
+-- Referência: §5.4 (mes-bridge).
 module Monitor.Multiset
   ( SKU
   , Multiset

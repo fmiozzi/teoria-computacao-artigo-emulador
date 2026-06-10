@@ -1,6 +1,7 @@
 ---
 cenario: "Aceitação — janela aberta e fechada sem retiradas"
 veredito_esperado: TOP
+status_esperado: liberado_integracao
 ---
 # A1 é trivialmente satisfeita (rem_i nunca ocorre). A3 exige
 # pronunciamento ao fim da janela; como M_obs = M_dec = ∅, o agente

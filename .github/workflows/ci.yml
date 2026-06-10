@@ -52,4 +52,10 @@ jobs:
           nix develop --command cabal run -v0 lab-monitor -- --quiet \
             Files/Traces/trace_01_aceita_simples.txt
           nix develop --command cabal run -v0 lab-monitor -- --json \
-            Files/Traces/trace_08_viola_a4_molde_vazio.txt > /dev/null
+            Files/Traces/trace_08_divergencia_molde_vazio.txt > /dev/null
+
+      - name: Corpus aleatório (gerador reproduzível + Proposição 2)
+        run: |
+          nix develop --command cabal run -v0 corpus-gen
+          # Reprodutibilidade: o corpus versionado deve ser idêntico ao gerado.
+          git diff --exit-code Files/Corpus

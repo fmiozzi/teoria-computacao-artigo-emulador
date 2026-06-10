@@ -19,6 +19,9 @@
 -- estrita demais para o emulador, que deve tolerar cenários históricos
 -- sem heartbeat e ao mesmo tempo capturar agentes "mortos" quando o
 -- traço se propõe a ser monitorado por A6.
+--
+-- Extensão prospectiva (artigo §6) — FORA do monitor composto verificado
+-- M = M₁ ⊗ M₂ ⊗ M₃ (A1–A3); não importada por "Monitor.Composed".
 module Monitor.Automata.A6
   ( M6State (..)
   , M6

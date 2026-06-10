@@ -1,0 +1,32 @@
+---
+cenario: "Molde vazio esquecido no MES (Situação 2 do artigo)"
+maquina: ROTO-01
+braco: 1
+m_dec: {caixa_1000L: 2, caixa_500L: 2}
+veredito_esperado: TOP
+status_esperado: divergencia_pcp
+---
+# Realidade física: 2× 1000L + 1× 500L + 1 molde vazio (idêntico ao
+# cenário 6). MAS o PCP esqueceu de declarar a posição vazia no MES.
+# M_dec = {1000L:2, 500L:2}, M_obs = {1000L:2, 500L:1}.
+#
+# O agente NÃO emite match_i nem div_i ao fim da janela. O mes-bridge
+# compara M_obs[τ_a, τ_b+T_cls] com M_dec, detecta a diferença e emite
+# div_i por mismatch dentro de T_dec. Como a decisão foi tomada no prazo,
+# A1/A2/A3 ficam satisfeitas → VEREDITO COMPOSTO ⊤.
+#
+# Mas div_i é decisão de PROCESSO, não violação de propriedade: o gate
+# BLOQUEIA com status divergencia_pcp (diag mismatch), encaminhando o
+# apontamento à tratativa manual no PCP. Ilustra a distinção essencial
+# veredito composto (⊤) ≠ status do gate (divergencia_pcp).
+
+[t=    0] ab_i
+[t= 1500] rem_i
+[t= 2000] cls_p_i caixa_1000L 0.93
+[t= 3500] rem_i
+[t= 4000] cls_p_i caixa_1000L 0.95
+[t= 5500] rem_i
+[t= 6000] cls_p_i caixa_500L 0.88
+[t= 8000] leave_ab_i
+# silêncio: agente não emite match_i nem div_i; o mes-bridge emite div_i
+# por mismatch dentro de T_dec → gate bloqueia com divergencia_pcp.

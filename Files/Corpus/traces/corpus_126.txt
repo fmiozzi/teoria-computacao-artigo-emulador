@@ -1,0 +1,16 @@
+---
+cenario: "Corpus aleatório — caso 126 (semente 25214903917)"
+m_dec: {molde_caixa_1000L_vazio: 1, molde_tampa_1000L_abastecido: 1}
+veredito_esperado: TOP
+status_esperado: divergencia_pcp
+---
+# Caso gerado por corpus-gen (PRNG determinístico). Veredito e status
+# abaixo foram computados pelo próprio monitor (oráculo reproduzível).
+[t=     0] ab_i
+[t=   245] rem_i
+[t=   796] cls_p_i caixa_500L 0.610955
+[t=  2161] rem_i
+[t=  2449] cls_p_i tampa_1000L 0.571374
+[t=  3145] rem_i
+[t=  3580] cls_p_i molde_caixa_1000L_vazio 0.894892
+[t=  3936] leave_ab_i

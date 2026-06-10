@@ -14,7 +14,7 @@ git clone https://github.com/fmiozzi/teoria-computacao-artigo-emulador.git
 cd teoria-computacao-artigo-emulador
 nix develop          # entra no shell reproduzível
 cabal build          # compila tudo
-cabal test           # roda os 20 testes
+cabal test           # roda os 31 testes
 ```
 
 Se você usa VS Code, a configuração em `.vscode/settings.json` é
@@ -30,7 +30,7 @@ devShell.
 2. Implemente a mudança mantendo:
    - `cabal build` limpo (sem warnings sob `-Wall -Wincomplete-patterns
      -Wincomplete-uni-patterns`);
-   - `cabal test` verde (20/20);
+   - `cabal test` verde (31/31);
    - documentação relevante atualizada (README, CHANGELOG,
      docs/CENARIOS, docs/ARQUITETURA).
 3. Faça commits pequenos e descritivos.
@@ -39,12 +39,19 @@ devShell.
 
 ## Adicionando novos cenários
 
-Para um cenário que **já é capturado pelas propriedades existentes**:
+Para um cenário que **já é capturado pelo recorte verificado (A1–A3 +
+filtro A5)**:
 
 1. Crie `Files/Traces/trace_NN_descricao.txt` com cabeçalho YAML
-   completo (especialmente `veredito_esperado: TOP|BOT`).
+   completo. Declare os dois oráculos:
+   - `veredito_esperado: TOP|BOT` — o veredito composto (ínfimo de
+     M₁⊗M₂⊗M₃, Proposição 2);
+   - `status_esperado: liberado_integracao|divergencia_pcp|erro_classificacao|erro_decisao`
+     — o status terminal do gate (§5.4). Lembre que veredito ≠ status:
+     um `mismatch` tem veredito ⊤ mas status `divergencia_pcp`.
 2. A suite Tasty pega o arquivo automaticamente — não precisa editar
-   `test/ExampleTraces.hs`.
+   `test/ExampleTraces.hs` (ela compara veredito **e**, quando
+   declarado, `status_esperado`).
 3. Adicione uma linha na tabela em [docs/CENARIOS.md](docs/CENARIOS.md).
 4. Verifique:
    ```bash
@@ -54,8 +61,16 @@ Para um cenário que **já é capturado pelas propriedades existentes**:
 
 ## Adicionando uma nova propriedade
 
-A arquitetura é deliberadamente extensível (Proposição 2 do artigo).
-Adicionar uma propriedade $A_n$ exige 5 passos mecânicos:
+O recorte **verificado** é o produto sincronizado `M = M₁ ⊗ M₂ ⊗ M₃`
+(A1 safety, A2′/A3′ bounded liveness). A4/A6/A7/A8 são **extensões
+prospectivas** (§6) e ficam como protótipos isolados em
+`Monitor.Automata.A4/A6/A7/A8`, **não** importados pelo produto nem pelo
+gate. Antes de mexer no produto, decida em qual dos dois mundos a nova
+propriedade vive.
+
+A arquitetura é deliberadamente extensível (Proposição 2 do artigo: o
+veredito composto é o ínfimo dos componentes). Para promover uma
+propriedade $A_n$ ao **produto verificado**, são 5 passos mecânicos:
 
 1. **Autômato.** Crie `src/Monitor/Automata/An.hs` com:
    - `data MnState = ...`

@@ -20,6 +20,9 @@
 -- Adicionalmente, 'lastClsValid' expõe o SKU pendente para que o
 -- composer decremente 'csObs' (a peça refugada não conta como produto
 -- válido).
+--
+-- Extensão prospectiva (artigo §6) — FORA do monitor composto verificado
+-- M = M₁ ⊗ M₂ ⊗ M₃ (A1–A3); não importada por "Monitor.Composed".
 module Monitor.Automata.A7
   ( M7State (..)
   , M7

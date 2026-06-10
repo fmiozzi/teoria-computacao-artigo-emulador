@@ -1,27 +1,31 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Autômato M2 — propriedade A2 (TLTL) do artigo:
+-- | Autômato M2 — propriedade A2 (liveness temporizada, TLTL) do artigo (v2):
 --
 -- @
---   A2 : G(rem_i → F_{[0, T_cls]} ∨_p cls_{p,i})
+--   A2 : G((leave_ab_i ∧ houve_rem_i) → F_{[0, T_cls]} ⋁_{j∈M, p∈P} cls_{p,i,j}^{≥τ})
 -- @
 --
--- "Toda retirada deve ser seguida de uma classificação dentro de
--- T_cls unidades de tempo, com confiança ≥ τ."
+-- "Em janelas com ao menos uma retirada (guarda houve_rem_i), ao encerrar
+-- a janela de abastecimento (leave_ab_i) deve existir ao menos uma
+-- classificação válida (confiança ≥ τ, filtro A5) acumulada no intervalo
+-- [τ_a, τ_b + T_cls]." A ancoragem temporal é o /encerramento da janela/,
+-- não a retirada individual (§4, Figura 5). Janelas inertes (sem retirada)
+-- satisfazem A2 vacuamente.
 --
 -- Modelado com 3 estados:
 --
--- * 'M2Idle' — sem rem_i pendente;
--- * 'M2Pending clock' — rem_i ocorreu em @clock@ ms, aguardando cls;
--- * 'M2Violated' — sumidouro absorvente.
+-- * 'M2Idle' — q_0, ocioso/aceitante (sem janela pendente);
+-- * 'M2Pending clock' — q_p, leave_ab_i ocorreu em @clock@ ms (relógio
+--   x := 0), aguardando classificação válida sob a guarda x ≤ T_cls;
+-- * 'M2Violated' — q_⊥, sumidouro absorvente (promove timeout_cls_i).
 --
 -- O filtro A5 (limiar de confiança @τ@) está embutido aqui: cls com
--- @conf < τ@ /não/ resolve a pendência. Isso preserva a semântica de
--- "classificação confiável" sem precisar de um autômato M5 separado.
+-- @conf < τ@ /não/ resolve a pendência (acceptance usa cls^{≥τ}).
 --
 -- /Política para fim de traço/: se o último estado é 'M2Pending', o
--- 'finalVerdict' retorna ⊥ — interpreta como "rem_i sem classificação".
--- Isto é a leitura estrita do operador @F_{[0, T_cls]}@ para um traço
+-- 'finalVerdict' retorna ⊥ — interpreta como "janela encerrada sem
+-- classificação válida". Leitura estrita de @F_{[0, T_cls]}@ num traço
 -- finito: a obrigação não foi cumprida.
 module Monitor.Automata.A2
   ( M2State (..)
@@ -30,6 +34,7 @@ module Monitor.Automata.A2
   , step
   , verdict
   , finalVerdict
+  , isViolation
   , summary
   ) where
 
@@ -37,53 +42,90 @@ import Monitor.Types (Config (..), Event (..), TimedEvent (..), Verdict (..))
 
 data M2State
   = M2Idle
-  | M2Pending !Int   -- ^ timestamp (ms) do rem_i pendente
+  | M2Pending !Int   -- ^ timestamp (ms) do leave_ab_i pendente (x := 0 nesse instante)
   | M2Violated
   deriving (Eq, Show)
 
 -- | Estado de M2 + parâmetros (T_cls, τ) embutidos. Isso evita que o
 -- composer precise propagar a 'Config' a cada step.
+--
+-- 'm2SeenValid' materializa a /existência agregada/ da legenda da figura:
+-- registra se já houve @cls^{≥τ}@ desde a abertura da janela (@ab_i@). No
+-- @leave_ab_i@, se a flag está ativa, A2 é satisfeita de imediato (a
+-- classificação ocorreu /durante/ a janela); caso contrário inicia-se o
+-- relógio, dando até @T_cls@ para uma classificação tardia.
+--
+-- 'm2SawRem' condiciona a obrigação à existência de retirada: uma janela
+-- /vazia/ (nenhum @rem_i@) é vacuosamente aceita — não há peça a
+-- classificar (refinamento operacional registrado em docs/DECISOES.md).
 data M2 = M2
-  { m2State :: !M2State
-  , m2Tcls  :: !Int     -- ^ T_cls em ms
-  , m2Tau   :: !Double  -- ^ limiar de A5
+  { m2State     :: !M2State
+  , m2SeenValid :: !Bool    -- ^ viu cls com conf ≥ τ desde a abertura da janela
+  , m2SawRem    :: !Bool    -- ^ houve rem_i desde a abertura da janela
+  , m2Tcls      :: !Int     -- ^ T_cls em ms
+  , m2Tau       :: !Double  -- ^ limiar de A5
   } deriving (Eq, Show)
 
 initial :: Config -> M2
 initial cfg = M2
-  { m2State = M2Idle
-  , m2Tcls  = cfgTcls cfg
-  , m2Tau   = cfgTau  cfg
+  { m2State     = M2Idle
+  , m2SeenValid = False
+  , m2SawRem    = False
+  , m2Tcls      = cfgTcls cfg
+  , m2Tau       = cfgTau  cfg
   }
 
 step :: M2 -> TimedEvent -> M2
 step m (TimedEvent now evt) = case m2State m of
   M2Violated -> m
   M2Idle -> case evt of
-    RemI -> m { m2State = M2Pending now }
-    _    -> m
+    -- Abertura de janela: zera a evidência agregada e a marca de retirada.
+    AbI  -> m { m2SeenValid = False, m2SawRem = False }
+    -- Retirada na janela: arma a obrigação de classificação.
+    RemI -> m { m2SawRem = True }
+    -- Classificação confiável (A5) durante a janela registra a evidência.
+    ClsPI _ conf | conf >= m2Tau m -> m { m2SeenValid = True }
+    -- Encerramento da janela: decide pela existência agregada.
+    LeaveAbI
+      -- Janela vazia (sem retirada): vacuosamente aceita.
+      | not (m2SawRem m) -> m { m2SeenValid = False, m2SawRem = False }
+      -- Houve retirada e classificação válida: satisfeita.
+      | m2SeenValid m    -> m { m2State = M2Idle, m2SeenValid = False, m2SawRem = False }
+      -- Houve retirada sem classificação válida ainda: aguarda tardia.
+      | otherwise        -> m { m2State = M2Pending now }
+    _ -> m
   M2Pending clock
     -- Prazo expirado: viola assim que o tempo de qualquer evento
     -- ultrapassa a janela T_cls — o próprio evento já não importa.
     | now - clock > m2Tcls m -> m { m2State = M2Violated }
     | otherwise -> case evt of
-        -- Classificação confiável (A5) resolve a pendência.
-        ClsPI _ conf | conf >= m2Tau m -> m { m2State = M2Idle }
+        -- Classificação confiável tardia (A5) resolve a pendência.
+        ClsPI _ conf | conf >= m2Tau m ->
+          m { m2State = M2Idle, m2SeenValid = False, m2SawRem = False }
         -- Demais eventos (inclusive cls com conf < τ) não alteram.
         _                              -> m
 
+-- | Veredito de /stream/ (LTL₃). A2' é bounded liveness realizada como
+-- safety (§5.3): sobre prefixo finito o ⊤ não é alcançável, logo o domínio
+-- é {⊥, ?}. Em 'M2Idle' ou 'M2Pending' o veredito é ? ("a obrigação ainda
+-- pode ser resgatada dentro de T_cls"); ao expirar o relógio, ⊥.
 verdict :: M2 -> Verdict
 verdict m = case m2State m of
   M2Violated -> Bot
-  _          -> Top
+  _          -> Inconclusive
 
--- | Em 'M2Pending' ao fim do traço também viola — a obrigação F[…]
--- não foi cumprida dentro do horizonte observado.
+-- | Veredito /terminal/. Em 'M2Pending' ao fim do traço a obrigação
+-- F_{[0,T_cls]} não foi cumprida no horizonte observado → ⊥; 'M2Idle'
+-- (sem obrigação pendente) → ⊤.
 finalVerdict :: M2 -> Verdict
 finalVerdict m = case m2State m of
   M2Violated  -> Bot
   M2Pending _ -> Bot
   M2Idle      -> Top
+
+-- | 'True' sse M₂ está no sumidouro de violação (promove timeout_cls_i).
+isViolation :: M2 -> Bool
+isViolation m = m2State m == M2Violated
 
 summary :: M2 -> String
 summary m = case m2State m of

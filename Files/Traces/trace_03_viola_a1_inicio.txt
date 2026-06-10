@@ -1,6 +1,7 @@
 ---
 cenario: "Violação A1 — rem_i ocorre antes de ab_i"
 veredito_esperado: BOT
+status_esperado: divergencia_pcp
 ---
 # Peça retirada antes da janela de abastecimento abrir.
 # Esperado: VIOLA na posição #1.
