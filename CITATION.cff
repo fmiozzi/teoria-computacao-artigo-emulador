@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "Se você usar este software, por favor cite-o conforme abaixo."
+type: software
+title: "lab-monitor: emulador de monitoramento LTL/TLTL para verificação de restrições operacionais em agentes de visão computacional"
+abstract: >-
+  Emulador de referência dos monitores LTL/TLTL (A1, A2', A3', A4/A5)
+  para verificação de restrições operacionais de agentes de visão
+  computacional, com composição por produto sincronizado e veredito
+  composto. Inclui um corpus reproduzível de 400 traços aleatórios
+  (PRNG determinístico, semente fixa) que materializa o property-based
+  testing da Proposição 2 (veredito composto = ínfimo de M1⊗M2⊗M3).
+authors:
+  - family-names: "Batista"
+    given-names: "Flávio Miozzi"
+    affiliation: "Instituto Federal do Espírito Santo (Ifes) — PPComp"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"   # preencha se tiver
+version: "1.0.0"
+date-released: "2026-06-12"
+license: MIT
+repository-code: "https://github.com/fmiozzi/teoria-computacao-artigo-emulador"
+url: "https://github.com/fmiozzi/teoria-computacao-artigo-emulador"
+# doi: "10.5281/zenodo.XXXXXXX"   # preencha na Fase D, após o Zenodo emitir

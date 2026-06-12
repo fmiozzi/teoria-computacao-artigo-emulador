@@ -1,0 +1,11 @@
+{
+  "title": "lab-monitor: emulador de monitoramento LTL/TLTL para verificação de restrições operacionais em agentes de visão computacional",
+  "description": "Emulador de referência dos monitores LTL/TLTL (A1, A2', A3', A4/A5) com composição por produto sincronizado, acompanhando o artigo (v2_3). Inclui corpus reproduzível de 400 traços aleatórios que materializa o property-based testing da Proposição 2 (veredito composto = ínfimo de M1⊗M2⊗M3), confirmada em 400/400.",
+  "upload_type": "software",
+  "version": "1.0.0",
+  "license": "MIT",
+  "creators": [
+    { "name": "Batista, Flávio Miozzi", "affiliation": "Instituto Federal do Espírito Santo (Ifes) — PPComp" }
+  ],
+  "keywords": ["runtime verification", "LTL", "TLTL", "monitor synthesis", "Haskell", "property-based testing"]
+}

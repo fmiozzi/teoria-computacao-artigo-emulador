@@ -12,6 +12,14 @@ no branch `main`.
 > **normativo v2_3** do artigo. Onde uma entrada antiga afirma algo hoje
 > falso, há uma marca `⚠ obsoleto desde 0.8.0`.
 
+## [1.0.0] — 2026-06-12 (primeiro release público com DOI)
+
+Primeiro release público e arquivado (Zenodo/DOI). O conteúdo técnico é
+idêntico à 0.8.0 (alinhamento ao artigo v2_3): núcleo do monitor, composição
+por produto sincronizado e o corpus reproduzível de 400 traços. Esta versão
+apenas promove a numeração para 1.0.0 e adiciona os metadados de citação
+(CITATION.cff, .zenodo.json).
+
 ## [0.8.0] — 2026 (alinhamento ao artigo v2_3)
 
 Reescrita do recorte verificado e do efetor para o modelo **normativo
