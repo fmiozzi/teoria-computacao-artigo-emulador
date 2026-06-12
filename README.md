@@ -1,5 +1,7 @@
 # Emulador — Monitor LTL/TLTL para Agentes de Visão em Manufatura
 
+[![DOI](https://zenodo.org/badge/1247702670.svg)](https://doi.org/10.5281/zenodo.20663708)
+
 Implementação em Haskell de um monitor de verificação em tempo de execução
 (*runtime verification*) para as restrições operacionais especificadas no
 artigo. O emulador concretiza, em código executável, a arquitetura de
@@ -249,6 +251,24 @@ re-executável pelo CLI (`lab-monitor Files/Corpus/traces/corpus_001.txt`).
 
 ## Como citar
 
+Se você usar este emulador, cite o **artefato de software** (DOI no Zenodo):
+
+```bibtex
+@software{batista2026emulador,
+  author    = {Batista, Fl{\'a}vio Miozzi},
+  title     = {lab-monitor: emulador de monitoramento LTL/TLTL para
+               verifica{\c c}{\~a}o de restri{\c c}{\~o}es operacionais
+               em agentes de vis{\~a}o computacional},
+  year      = {2026},
+  version   = {1.0.0},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.20663708},
+  url       = {https://doi.org/10.5281/zenodo.20663708}
+}
+```
+
+A dissertação correspondente:
+
 ```bibtex
 @mastersthesis{miozzi2026monitor,
   author  = {Batista, Fl{\'a}vio Miozzi},
@@ -257,15 +277,9 @@ re-executável pelo CLI (`lab-monitor Files/Corpus/traces/corpus_001.txt`).
              Monitoramento},
   school  = {Programa de P{\'o}s-Gradua{\c c}{\~a}o em Computa{\c c}{\~a}o
              Aplicada (PPComp), Instituto Federal do Esp{\'i}rito Santo (Ifes)},
-  year    = {2026},
-  doi     = {TODO: preencher com o DOI assim que emitido},
-  url     = {TODO: URL do registro com DOI}
+  year    = {2026}
 }
 ```
-
-> O artefato de software (este emulador) recebe um DOI próprio no
-> depósito (Zenodo/figshare); atualize os campos `doi`/`url` acima quando
-> emitido.
 
 ## Licença
 
